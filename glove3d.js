@@ -12,6 +12,13 @@ export { THREE };
 let CFG = null;
 const TEX = {};
 const GRAIN = { uTime: { value: 0 }, uGrain: { value: 0.0 } };
+// Doblez de la muñeca: el puño del guante gira con el antebrazo y la parte de la mano sigue a la mano.
+// Se aplica en el shader de todos los materiales del guante (cuero, calcos, cordones, ribete).
+const BEND = { uBendQ: { value: new THREE.Vector4(0, 0, 0, 1) }, uBendPivot: { value: new THREE.Vector3(0, 0.21, 0) }, uBendRange: { value: new THREE.Vector2(0.05, 0.31) } };
+export function setBend(q, pivotY, y0, y1) {
+  BEND.uBendQ.value.set(q.x, q.y, q.z, q.w);
+  if (pivotY !== undefined) { BEND.uBendPivot.value.set(0, pivotY, 0); BEND.uBendRange.value.set(y0, y1); }
+}
 const MATS = new Set();
 let ENV_INT = 1;
 export function setEnvIntensity(v){ ENV_INT = v; MATS.forEach(m => m.envMapIntensity = v * (m.userData.envMult || 1)); }
@@ -209,13 +216,21 @@ function makeShadowTexture() {
 }
 
 /* ===================== Grano de cámara en los materiales ===================== */
+const BEND_GLSL = `uniform vec4 uBendQ; uniform vec3 uBendPivot; uniform vec2 uBendRange;
+vec4 bendQ(float y){ float w = 1.0 - smoothstep(uBendRange.x, uBendRange.y, y); return normalize(mix(vec4(0.0,0.0,0.0,1.0), uBendQ, w)); }
+vec3 qrot(vec4 q, vec3 v){ return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
+`;
 function addGrain(mat) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = GRAIN.uTime; sh.uniforms.uGrain = GRAIN.uGrain;
+    Object.assign(sh.uniforms, BEND);
+    sh.vertexShader = BEND_GLSL + sh.vertexShader
+      .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n  vec4 bq = bendQ(position.y); objectNormal = qrot(bq, objectNormal);')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed = uBendPivot + qrot(bendQ(position.y), transformed - uBendPivot);');
     sh.fragmentShader = 'uniform float uTime;\nuniform float uGrain;\n' + sh.fragmentShader.replace('#include <dithering_fragment>',
       '#include <dithering_fragment>\n  float gn = fract(sin(dot(gl_FragCoord.xy + vec2(uTime*61.0, uTime*17.0), vec2(12.9898,78.233))) * 43758.5453);\n  gl_FragColor.rgb += (gn - 0.5) * uGrain;');
   };
-  mat.customProgramCacheKey = () => 'grain';
+  mat.customProgramCacheKey = () => 'grain-bend';
   mat.envMapIntensity = ENV_INT * (mat.userData.envMult || 1); MATS.add(mat);
   return mat;
 }
@@ -545,6 +560,7 @@ async function sculptedGlove(modelKey) {
   const lace = addGrain(new THREE.MeshStandardMaterial({ color: '#F4EFE6', roughness: 0.9, normalMap: TEX.fabric.normal, normalScale: new THREE.Vector2(0.8, 0.8) }));
   const metal = new THREE.MeshStandardMaterial({ color: '#C9C4BA', metalness: 1, roughness: 0.32 }); metal.userData.envMult = 2.2; addGrain(metal);
   const tongue = addGrain(new THREE.MeshPhysicalMaterial({ color: '#BDB4A5', map: L.color, normalMap: L.normal, roughnessMap: L.rough, roughness: 1 }));
+  const lining = addGrain(new THREE.MeshStandardMaterial({ color: '#1C1916', roughness: 0.95, normalMap: TEX.fabric.normal }));
   const mkFoil = () => { const f = new THREE.MeshPhysicalMaterial({ color: '#C9A24A', metalness: 1, roughness: 0.28, alphaMap: TEX.logo.alpha, normalMap: TEX.logo.normal,
     transparent: true, alphaTest: 0.35, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }); f.userData.envMult = 2.8; return addGrain(f); };
 
@@ -588,6 +604,22 @@ async function sculptedGlove(modelKey) {
     put(meta.decals.emblem, TEX.emblem, upper, 0.005);
     put(meta.decals.side, TEX.emblem, upper, 0.005);
     put(meta.decals.plaque, TEX.plaque, lower, 0.005);
+    if (meta.cuffOpening) {
+      // abertura del puño: ribete de cuero con grosor y una franja de forro oscuro hacia adentro,
+      // así se ve el brazo entrando al guante en lugar de una tapa cerrada
+      const op = meta.cuffOpening, Nn = 96, ring = [];
+      for (let i = 0; i < Nn; i++) { const t = i / Nn * Math.PI * 2; ring.push(new THREE.Vector3(op.cx + Math.cos(t) * (op.a + 0.006), op.y + 0.012, op.cz + Math.sin(t) * (op.b + 0.006))); }
+      lower.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ring, true), 192, 0.024, 10, true), trim));
+      const lpos = [], lidx = [], H2 = 0.14, R = 6;
+      for (let r = 0; r <= R; r++) for (let i = 0; i <= Nn; i++) { const t = i / Nn * Math.PI * 2, k = 1 - r / R * 0.06;
+        lpos.push(op.cx + Math.cos(t) * (op.a - 0.008) * k, op.y + r / R * H2, op.cz + Math.sin(t) * (op.b - 0.008) * k); }
+      for (let r = 0; r < R; r++) for (let i = 0; i < Nn; i++) { const a = r * (Nn + 1) + i, b = a + 1, c = a + Nn + 1, d = c + 1; lidx.push(a, b, d, a, d, c); }
+      const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lpos, 3)); lg.setIndex(lidx); lg.computeVertexNormals();
+      // normales hacia el centro (se ve la cara interna del forro del lado opuesto)
+      const ln = lg.attributes.normal; let flip = false; { const nx = ln.getX(0), nz = ln.getZ(0); flip = nx * (lpos[0] - op.cx) + nz * (lpos[2] - op.cz) > 0; }
+      if (flip) { const ix = lg.index.array; for (let k = 0; k < ix.length; k += 3) { const t = ix[k + 1]; ix[k + 1] = ix[k + 2]; ix[k + 2] = t; } lg.computeVertexNormals(); }
+      lower.add(new THREE.Mesh(lg, lining));
+    }
     if (model.cierre === 'cordones' && meta.eyelets && meta.eyelets.length) addLaces();
   } else if (meta.scan) {
     const logo = new THREE.Mesh(gridDecal(meta.decals.logo, 0.006), mkFoil()); upper.add(logo); logos.push(logo);
@@ -718,7 +750,7 @@ export function createARStage(renderer) {
   shadow.visible = false; scene.add(shadow);
   let lastEnv = 0;
   return {
-    scene, lights: L, shadow,
+    scene, lights: L, shadow, expoMul: 1,
     /* Entorno a partir del video: el guante refleja y toma el color del lugar real */
     updateEnv(video, mirror, now) {
       if (now - lastEnv < 1500 || !video.videoWidth) return; lastEnv = now;
@@ -739,10 +771,14 @@ export function createARStage(renderer) {
       const b = Math.min(1.4, Math.max(0.25, st.lum / 120));
       const dir = new THREE.Vector3(st.dx * 2.2, st.dy * 2.2 + 0.6, 1).normalize();
       L.key.position.copy(dir); L.key.intensity = lerp(L.key.intensity, 1.1 + 1.5 * b, 0.2);
-      const m = Math.max(st.r, st.g, st.b, 1); L.key.color.setRGB(lerp(1, st.r / m, 0.35), lerp(1, st.g / m, 0.35), lerp(1, st.b / m, 0.35));
-      L.hemi.intensity = lerp(L.hemi.intensity, 0.08 + 0.15 * b, 0.2);
-      setEnvIntensity(lerp(ENV_INT, 0.25 + 0.3 * b, 0.2));
-      renderer.toneMappingExposure = lerp(renderer.toneMappingExposure, Math.min(1.05, Math.max(0.78, 0.78 + b * 0.16)), 0.15);
+      // color de la luz: el de las zonas más claras de la imagen (blanco de referencia de la escena)
+      const wr = st.wr ?? st.r, wg = st.wg ?? st.g, wb = st.wb ?? st.b, m = Math.max(wr, wg, wb, 1);
+      L.key.color.setRGB(lerp(1, wr / m, 0.6), lerp(1, wg / m, 0.6), lerp(1, wb / m, 0.6));
+      const am = Math.max(st.r, st.g, st.b, 1); L.hemi.color.setRGB(lerp(1, st.r / am, 0.5), lerp(1, st.g / am, 0.5), lerp(1, st.b / am, 0.5));
+      L.hemi.intensity = lerp(L.hemi.intensity, 0.12 + 0.2 * b, 0.2);
+      setEnvIntensity(lerp(ENV_INT, 0.4 + 0.35 * b, 0.2));
+      // exposición: base según el brillo y corrección medida (el guante se compara con los blancos de la escena)
+      renderer.toneMappingExposure = lerp(renderer.toneMappingExposure, Math.min(2.4, Math.max(0.55, (0.82 + b * 0.16) * this.expoMul)), 0.25);
       GRAIN.uGrain.value = Math.min(0.06, Math.max(0.012, 0.012 + (110 - st.lum) / 2200));
       this.lightDir = dir;
     },

@@ -87,10 +87,35 @@ def load_model(prefix):
     return meta, V, N, F
 
 
+def open_cuff(V, F, pad=0.09):
+    """Abre el borde del puño: el escáner lo cierra con una tapa. Se quitan las caras que miran hacia abajo
+    dentro de una elipse (la abertura por donde entra el brazo, del tamaño del puño menos el acolchado) y se
+    devuelve la elipse para dibujar el ribete y el forro interior."""
+    V = np.asarray(V, float); F = np.asarray(F)
+    y0 = float(V[:, 1].min())
+    b = np.abs(V[:, 1] - (y0 + 0.05)) < 0.01
+    cx = float((V[b, 0].min() + V[b, 0].max()) / 2); cz = float((V[b, 2].min() + V[b, 2].max()) / 2)
+    a = float((V[b, 0].max() - V[b, 0].min()) / 2 - pad); c = float((V[b, 2].max() - V[b, 2].min()) / 2 - pad)
+    fn = np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]]); fn /= np.linalg.norm(fn, axis=1, keepdims=True) + 1e-12
+    ce = V[F].mean(1)
+    inside = ((ce[:, 0] - cx) / a) ** 2 + ((ce[:, 2] - cz) / c) ** 2 < 1.0
+    # todo lo que queda adentro de la elipse en la parte baja son restos de la tapa y del dobladillo
+    # (las paredes del puño están afuera de la elipse)
+    cut = inside & (ce[:, 1] < y0 + 0.30)
+    return F[~cut], dict(cx=round(cx, 4), cz=round(cz, 4), a=round(a, 4), b=round(c, 4), y=round(y0 + 0.012, 4)), int(cut.sum())
+
+
 if __name__ == '__main__':
     prefix = sys.argv[1] if len(sys.argv) > 1 else 'models/tempo-scan'
     meta, V, N, F = load_model(prefix)
     decals, eyes, info = details(V, N, F)
     meta['decals'] = decals; meta['eyelets'] = eyes; meta['design'] = 'tempo-1'
+    if '--abrir-puno' in sys.argv:
+        F2, op, n = open_cuff(V, F)
+        buf = bytearray(open(prefix + '.bin', 'rb').read()); nv = meta['counts']['v']
+        o = nv * 12 + nv * 6 + nv * 8 + nv + meta['aoPad']
+        open(prefix + '.bin', 'wb').write(bytes(buf[:o]) + F2.astype(np.uint32).tobytes())
+        meta['counts']['f'] = int(len(F2)); meta['cuffOpening'] = op
+        print('puño abierto:', n, 'caras quitadas', op)
     json.dump(meta, open(prefix + '.json', 'w'))
     print('detalles listos', info)

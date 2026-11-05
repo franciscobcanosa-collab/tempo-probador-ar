@@ -106,7 +106,8 @@ p{margin:0}
 #stage{position:absolute;inset:0;overflow:hidden;background:#000}
 #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #video.mirror{transform:scaleX(-1)}
-#gl,#dots,#bg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#gl,#dots,#bg,#fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#gl{opacity:0}
 #video.synced{opacity:0}
 .cam-ui{position:absolute;inset:0;display:flex;flex-direction:column;pointer-events:none;
   padding:calc(env(safe-area-inset-top,0px) + 12px) max(12px,env(safe-area-inset-right,0px)) 0 max(12px,env(safe-area-inset-left,0px))}
@@ -299,6 +300,7 @@ p{margin:0}
     <canvas id="bg"></canvas>
     <canvas id="dots"></canvas>
     <canvas id="gl"></canvas>
+    <canvas id="fx"></canvas>
     <div class="guide" id="frame" aria-hidden="true"><span class="scanline"></span></div>
     <div class="countdown" id="countdown" hidden></div>
     <div class="flash" id="flash"></div>
@@ -459,6 +461,8 @@ const CONFIG = {
   fit: { unitsPerPalm:1.2, wristY:0.21, widthToLength:1.3 },
   // Tapar con el fondo difuminado lo que asoma de la mano real alrededor del guante
   eraseHand: true,
+  // Desenfoque del guante cuando la mano se mueve rápido (como sale la imagen real)
+  motionBlur: true,
   ozScale: { 10:0.90, 12:0.95, 14:1.0, 16:1.05 }
 };
 const PESOS = ['menos de 55 kg','55 a 70 kg','70 a 85 kg','más de 85 kg'];
@@ -736,7 +740,7 @@ async function startCamera(){
   running = true; loop();
 }
 function stopStream(){ if (stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } }
-function stopCamera(){ synced=false; video.classList.remove('synced'); bctx.clearRect(0,0,view.w||0,view.h||0); running=false; if (camRAF) cancelAnimationFrame(camRAF); camRAF=null; stopStream(); video.srcObject=null; }
+function stopCamera(){ if (G3) G3.setBend(new THREE.Quaternion()); if (stage) stage.expoMul = 1; FA.ang = 0; WZ.ok = false; mb = { x:0, y:0, t:0, vx:0, vy:0 }; synced=false; video.classList.remove('synced'); bctx.clearRect(0,0,view.w||0,view.h||0); running=false; if (camRAF) cancelAnimationFrame(camRAF); camRAF=null; stopStream(); video.srcObject=null; }
 
 async function setupScene(){
   if (!renderer3){
@@ -798,11 +802,33 @@ function measureLight(){
     for (let y=0;y<24;y++) for (let x=0;x<32;x++){ const i=(y*32+x)*4, l=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; s+=l; r+=d[i]; g+=d[i+1]; b+=d[i+2]; if (x<16) L+=l; else Rr+=l; if (y<12) T+=l; else B+=l; }
     const n=32*24; lightLevel = s/n;
     let dx = (Rr-L)/(s||1), dy = (T-B)/(s||1); if (view.mirror) dx = -dx;
-    lightStats = { lum:lightLevel, r:r/n, g:g/n, b:b/n, dx, dy };
-    if (stage) stage.updateLights(lightStats);
+    // blanco de referencia: promedio del 8 % más claro de la imagen (su brillo y su color)
+    const lum = []; for (let i=0;i<n;i++) lum.push([0.2126*d[i*4]+0.7152*d[i*4+1]+0.0722*d[i*4+2], i]);
+    lum.sort((a,b)=>b[0]-a[0]); const top = lum.slice(0, Math.max(4, Math.round(n*0.08)));
+    let wl=0, wr=0, wg=0, wb=0; for (const [l,i] of top){ wl+=l; wr+=d[i*4]; wg+=d[i*4+1]; wb+=d[i*4+2]; }
+    wl/=top.length; wr/=top.length; wg/=top.length; wb/=top.length;
+    lightStats = { lum:lightLevel, r:r/n, g:g/n, b:b/n, dx, dy, white:wl, wr, wg, wb };
+    if (stage){ calibrateExposure(wl); stage.updateLights(lightStats); }
   } catch(_){}
   const el=$('st-light'); if (lightLevel==null) return;
   if (lightLevel < 55){ el.textContent='Baja'; el.className='warn'; } else { el.textContent='Buena'; el.className='ok'; }
+}
+/* Exposición medida: se lee el guante ya dibujado (en baja resolución) y se compara su brillo medio con el que
+   tendría un objeto de ese color bajo la luz de la escena (según los blancos de la imagen). Así el guante
+   blanco no queda gris en una escena luminosa ni brilla de más en una oscura. */
+const gc = document.createElement('canvas'); gc.width = 24; gc.height = 48; const gcx = gc.getContext('2d', { willReadFrequently:true });
+function calibrateExposure(sceneWhite){
+  if (!glove3 || !glove3.root.visible || phase !== 'on') return;
+  try {
+    gcx.clearRect(0,0,24,48); gcx.drawImage(glCanvas, 0, 0, 24, 48);
+    const d = gcx.getImageData(0,0,24,48).data; let s=0, n=0;
+    for (let i=0;i<d.length;i+=4) if (d[i+3] > 220){ s += 0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; n++; }
+    if (n < 12) return;
+    const hex = CONFIG.colors[S.color].leather, c = parseInt(hex.slice(1),16), alb = (0.2126*(c>>16&255)+0.7152*(c>>8&255)+0.0722*(c&255))/255;
+    const target = Math.min(235, sceneWhite) * (0.2 + 0.62*alb), meas = s/n;
+    const f = THREE.MathUtils.clamp(Math.pow(target/Math.max(8, meas), 0.4), 0.85, 1.18);
+    stage.expoMul = THREE.MathUtils.clamp(stage.expoMul * f, 0.6, 2.6);
+  } catch(_){ }
 }
 function toScreen(lm){
   let x = lm.x*view.vw*view.scale + view.ox;
@@ -853,16 +879,17 @@ function boxBlur(src, dst, w, h, r, tmp){          // desenfoque separable por s
     for (let y=-r; y<=r; y++) acc += tmp[Math.min(h-1, Math.max(0,y))*w + x];
     for (let y=0; y<h; y++){ dst[y*w+x] = acc/n; acc += tmp[Math.min(h-1, y+r+1)*w + x] - tmp[Math.max(0, y-r)*w + x]; } }
 }
-function eraseHand(pts, now){
+function eraseHand(pts, now, LR){
   if (!CONFIG.eraseHand || !pts) return;
-  const t0 = performance.now(); eraseCore(pts, now);
+  const t0 = performance.now(); eraseCore(pts, now, LR);
   // si en un celular lento tarda demasiado, baja la resolución; si igual tarda, se apaga para no frenar el seguimiento
   const E = ERASE, dt = performance.now() - t0; E.avg = E.frames++ ? E.avg*0.9 + dt*0.1 : dt;
   if (CONFIG.eraseGuard !== false && E.frames > 15 && E.avg > 14){ if (E.cap > 64){ E.cap = 64; E.avg = 8; E.frames = 1; } else if (E.avg > 20){ CONFIG.eraseHand = false; console.warn('Borrado de la mano desactivado: el dispositivo es lento'); } }
 }
-function eraseCore(pts, now){
-  const W = Math.max(48, Math.round(Math.min(ERASE.cap, view.w*0.27))), k = W / view.w, H = Math.max(48, Math.round(view.h*k)), N = W*H;
+/* Cuadro del video en baja resolución, una vez por resultado: lo usan el borrado de la mano y la detección del antebrazo */
+function lowRes(){
   const E = ERASE;
+  const W = Math.max(48, Math.round(Math.min(E.cap, view.w*0.27))), k = W / view.w, H = Math.max(48, Math.round(view.h*k)), N = W*H;
   if (!E.cv || E.cv.width !== W || E.cv.height !== H){
     for (const n of ['cv','mk','pt']){ E[n] = document.createElement('canvas'); E[n].width = W; E[n].height = H; }
     E.cx = E.cv.getContext('2d', { willReadFrequently:true }); E.mx = E.mk.getContext('2d', { willReadFrequently:true }); E.px = E.pt.getContext('2d');
@@ -870,7 +897,12 @@ function eraseCore(pts, now){
     E.a = { hard:F(), wgt:F(), tmp:F(), bw:F(), bwL:F(), soft:F(), ch:[F(),F(),F()], bl:[F(),F(),F()], blL:[F(),F(),F()] };
     E.out = E.px.createImageData(W, H);
   }
-  const A = E.a;
+  E.cx.save(); if (view.mirror){ E.cx.translate(W, 0); E.cx.scale(-1, 1); }
+  E.cx.drawImage(video, view.ox*k, view.oy*k, view.vw*view.scale*k, view.vh*view.scale*k); E.cx.restore();
+  return { W, H, k, N };
+}
+function eraseCore(pts, now, LR){
+  const E = ERASE, { W, H, k } = LR, A = E.a;
   // máscara de la mano (con margen extra si se mueve rápido: el cuadro puede tener la mano corrida o borrosa)
   const P = pts.map(p => [p[0]*k, p[1]*k]);
   const palmW = Math.hypot(P[5][0]-P[17][0], P[5][1]-P[17][1]) || 10;
@@ -885,9 +917,6 @@ function eraseCore(pts, now){
   const pad = Math.ceil(lw + palmW*1.8);
   x0 = Math.max(0, Math.floor(x0-pad)); y0 = Math.max(0, Math.floor(y0-pad)); x1 = Math.min(W, Math.ceil(x1+pad)); y1 = Math.min(H, Math.ceil(y1+pad));
   const w = x1-x0, h = y1-y0; if (w < 4 || h < 4) return; const n = w*h;
-  // fondo en baja resolución tomado directo del video (leer el lienzo grande desde la GPU es lento)
-  E.cx.save(); if (view.mirror){ E.cx.translate(W, 0); E.cx.scale(-1, 1); }
-  E.cx.drawImage(video, view.ox*k, view.oy*k, view.vw*view.scale*k, view.vh*view.scale*k); E.cx.restore();
   const d = E.cx.getImageData(x0,y0,w,h).data, md = m.getImageData(x0,y0,w,h).data;
   const { hard, wgt, tmp, bw, bwL, soft, ch, bl, blL } = A;
   for (let i=0;i<n;i++){ const a = md[i*4+3] > 20 ? 1 : 0; hard[i]=a; wgt[i]=1-a; ch[0][i]=d[i*4]*wgt[i]; ch[1][i]=d[i*4+1]*wgt[i]; ch[2][i]=d[i*4+2]*wgt[i]; }
@@ -908,6 +937,41 @@ function eraseCore(pts, now){
   E.px.putImageData(E.out, 0, 0);
   bctx.save(); bctx.imageSmoothingEnabled = true; bctx.imageSmoothingQuality = 'high'; bctx.drawImage(E.pt, 0, 0, view.w, view.h); bctx.restore();
 }
+/* Dirección del antebrazo (opción sin modelos extra): se calibra el color de la piel con la palma y se busca,
+   entre las direcciones que salen de la muñeca hacia abajo (±80° de la línea de la mano), la que tiene más piel.
+   La confianza es cuánto se destaca la mejor dirección del resto: con manga larga o un fondo del mismo color
+   no se destaca y el puño queda alineado con la mano. */
+const FA = { ang:0, conf:0 };
+function estimateForearm(pts, LR){
+  const { W, H, k } = LR, P = pts.map(p => [p[0]*k, p[1]*k]);
+  const w0 = P[0], ux0 = P[9][0]-w0[0], uy0 = P[9][1]-w0[1], L = Math.hypot(ux0, uy0); if (L < 3) return;
+  const ux = ux0/L, uy = uy0/L, palmW = Math.hypot(P[5][0]-P[17][0], P[5][1]-P[17][1]);
+  const R = Math.ceil(L*2.3), x0 = Math.max(0, Math.floor(w0[0]-R)), y0 = Math.max(0, Math.floor(Math.min(w0[1], P[9][1])-R)), x1 = Math.min(W, Math.ceil(w0[0]+R)), y1 = Math.min(H, Math.ceil(w0[1]+R));
+  const w = x1-x0, h = y1-y0; if (w < 4 || h < 4) return;
+  const d = ERASE.cx.getImageData(x0, y0, w, h).data;
+  const ycc = (x, y) => { const xi = Math.round(x)-x0, yi = Math.round(y)-y0; if (xi<0||yi<0||xi>=w||yi>=h) return null; const i=(yi*w+xi)*4, r=d[i], g=d[i+1], b=d[i+2];
+    return [0.299*r+0.587*g+0.114*b, 128-0.1687*r-0.3313*g+0.5*b, 128+0.5*r-0.4187*g-0.0813*b]; };
+  const lerp2 = (a, b, t) => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t];
+  const ref = [lerp2(w0,P[9],0.3), lerp2(w0,P[9],0.5), lerp2(w0,P[5],0.45), lerp2(w0,P[17],0.45), lerp2(P[5],P[17],0.5), lerp2(w0,P[1],0.5)].map(q => ycc(q[0], q[1])).filter(Boolean);
+  if (ref.length < 3) return;
+  const med = (i) => ref.map(r => r[i]).sort((a,b)=>a-b)[ref.length>>1];
+  const Y0 = med(0), Cb0 = med(1), Cr0 = med(2);
+  const skin = (q) => { if (!q) return 0; const dc = Math.hypot(q[1]-Cb0, q[2]-Cr0); return Math.exp(-(dc/7)*(dc/7)) * (Math.abs(q[0]-Y0) < 85 ? 1 : 0.25); };
+  const scores = [], angs = [];
+  for (let a = -80; a <= 80; a += 5){
+    const t = a*Math.PI/180, c = Math.cos(t), s2 = Math.sin(t);
+    const dx = -ux*c + uy*s2, dy = -uy*c - ux*s2, px = -dy, py = dx;          // dirección (pantalla, y hacia abajo) y su perpendicular
+    let sum = 0, n = 0;
+    for (let r = 0.55; r <= 2.1; r += 0.13) for (const off of [-0.22, 0, 0.22]){ sum += skin(ycc(w0[0]+dx*r*L+px*off*palmW, w0[1]+dy*r*L+py*off*palmW)); n++; }
+    scores.push(sum/n * (0.88 + 0.12*c)); angs.push(t);
+  }
+  const sm = scores.map((v,i) => (scores[Math.max(0,i-1)] + 2*v + scores[Math.min(scores.length-1,i+1)])/4);
+  let bi = 0; sm.forEach((v,i) => { if (v > sm[bi]) bi = i; });
+  const sorted = sm.slice().sort((a,b)=>a-b), conf = sm[bi] - sorted[sorted.length>>1];
+  const target = (conf > 0.16 && sm[bi] > 0.35) ? THREE.MathUtils.clamp(angs[bi], -0.87, 0.87) : 0;
+  FA.ang += (target - FA.ang) * 0.35; FA.conf += (Math.min(1, conf*2.5) - FA.conf) * 0.3;
+}
+let WZ = { u:0, a:0, ok:false };
 function onResults(res){
   if (!running) return;
   const now = performance.now();
@@ -921,9 +985,9 @@ function onResults(res){
       seenFrames = Math.max(0, seenFrames-2);
       if (now - scanStart > NOHAND_MS && $('scan-error').hidden) showNoHand();
     } else if (now - lastSeen > LOST_MS){
-      glove3.root.visible = false; stage.updateShadow(null,null,0,false); setStatus('Buscando tu mano…','warn'); filters = null; sizeF = null; palmVote = 0; $('pins').hidden = true;
+      glove3.root.visible = false; stage.updateShadow(null,null,0,false); setStatus('Buscando tu mano…','warn'); filters = null; sizeF = null; palmVote = 0; $('pins').hidden = true; WZ.ok = false; FA.ang = 0;
     }
-    renderer3.render(scene3, cam3);
+    renderer3.render(scene3, cam3); composeGlove(now);
     return;
   }
   lastSeen = now;
@@ -956,8 +1020,29 @@ function onResults(res){
     setStatus(`Midiendo tu mano… ${Math.min(100, Math.round(seenFrames/18*100))}%`,'warn');
     if (seenFrames >= 18) placeGlove();
   }
-  if (phase==='on') { eraseHand(pts, now); setStatus('✓ Guante colocado','ok'); updateGlove(smooth, palmSide(res, rightOnScreen)); }
+  if (phase==='on') {
+    const LR = lowRes();
+    eraseHand(pts, now, LR);
+    try { estimateForearm(pts, LR); } catch(_){ }
+    setStatus('✓ Guante colocado','ok');
+    updateGlove(smooth, palmSide(res, rightOnScreen), res.multiHandWorldLandmarks && res.multiHandWorldLandmarks[0], now);
+  }
   renderer3.render(scene3, cam3);
+  composeGlove(now);
+}
+/* Desenfoque de movimiento: la imagen real sale borrosa cuando la mano se mueve rápido; el guante también.
+   Se compone el render en otro lienzo con varias copias desplazadas en la dirección del movimiento. */
+const fx = $('fx'), fxc = fx.getContext('2d'); let mb = { x:0, y:0, t:0, vx:0, vy:0 };
+function composeGlove(now){
+  if (fx.width !== glCanvas.width || fx.height !== glCanvas.height){ fx.width = glCanvas.width; fx.height = glCanvas.height; }
+  fxc.clearRect(0, 0, fx.width, fx.height);
+  if (!glove3 || !glove3.root.visible){ return; }
+  const kx = fx.width / view.w;
+  const bx = mb.vx * 0.022 * kx, by = mb.vy * 0.022 * kx, len = Math.hypot(bx, by), cap = 26*kx;
+  const f = len > cap ? cap/len : 1, ox = bx*f, oy = by*f;
+  if (len < 1.5*kx || !CONFIG.motionBlur){ fxc.drawImage(glCanvas, 0, 0); return; }
+  const N = 5; for (let i = 0; i < N; i++){ const t = i/(N-1) - 0.5; fxc.globalAlpha = 1/(i+1); fxc.drawImage(glCanvas, -ox*t, -oy*t); }
+  fxc.globalAlpha = 1;
 }
 function drawSkeleton(p){
   const C = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
@@ -1006,37 +1091,68 @@ function palmSide(res, rightOnScreen){
   palmVote = THREE.MathUtils.clamp(palmVote*0.8 + vote*0.2, -1, 1);
   return palmVote >= 0 ? 1 : -1;
 }
-function updateGlove(p, nIsBack){
+function updateGlove(p, nIsBack, wl, now){
   const wrist=V(p[0]), idx=V(p[5]), mid=V(p[9]), pky=V(p[17]), tip=V(p[12]);
   const upv = new THREE.Vector3().subVectors(mid, wrist);
-  const palm = upv.length(); if (palm < 8) return;
-  const up = upv.clone().normalize();
-  const across = new THREE.Vector3().subVectors(idx, pky); across.addScaledVector(up, -across.dot(up)).normalize();
+  const palm2 = Math.hypot(upv.x, upv.y); if (palm2 < 8) return;
+  const acr = new THREE.Vector3().subVectors(idx, pky), acr2 = Math.hypot(acr.x, acr.y) || 1;
+  // Orientación 3D: la dirección en la imagen sale de los puntos de pantalla (precisos) y la inclinación hacia la
+  // cámara de las coordenadas 3D del detector (los puntos de pantalla achatan la profundidad)
+  let uz = upv.z / Math.max(1e-6, upv.length()), az = acr.z / Math.max(1e-6, acr.length());
+  if (wl){
+    const Wp = (i) => new THREE.Vector3(view.mirror ? -wl[i].x : wl[i].x, -wl[i].y, -wl[i].z);
+    const uw = Wp(9).sub(Wp(0)).normalize(), aw = Wp(5).sub(Wp(17)).normalize();
+    if (!WZ.ok){ WZ.u = uw.z; WZ.a = aw.z; WZ.ok = true; } else { WZ.u += (uw.z - WZ.u)*0.45; WZ.a += (aw.z - WZ.a)*0.45; }
+    uz = WZ.u; az = WZ.a;
+  }
+  uz = THREE.MathUtils.clamp(uz, -0.9, 0.9); az = THREE.MathUtils.clamp(az, -0.9, 0.9);
+  const ru = Math.sqrt(1 - uz*uz), ra = Math.sqrt(1 - az*az);
+  const up = new THREE.Vector3(upv.x/palm2*ru, upv.y/palm2*ru, uz).normalize();
+  const across = new THREE.Vector3(acr.x/acr2*ra, acr.y/acr2*ra, az); across.addScaledVector(up, -across.dot(up)).normalize();
   const n = new THREE.Vector3().crossVectors(across, up).normalize();
   const back = nIsBack > 0 ? n.clone() : n.clone().negate();
   const xl = new THREE.Vector3().crossVectors(up, back).normalize();
   const thumbSign = Math.sign(across.dot(xl)) || 1;
   glove3.setThumbSide(thumbSign);
-  window.__ar = { nIsBack, palmVote:+palmVote.toFixed(2), thumbSign, back:[+back.x.toFixed(2),+back.y.toFixed(2),+back.z.toFixed(2)] };   // diagnóstico (pruebas)
+  window.__ar = { nIsBack, palmVote:+palmVote.toFixed(2), thumbSign, back:[+back.x.toFixed(2),+back.y.toFixed(2),+back.z.toFixed(2)], forearm:+(FA.ang*180/Math.PI).toFixed(1), faConf:+FA.conf.toFixed(2) };   // diagnóstico (pruebas)
   // Se amolda: el cuerpo del guante se acorta al cerrar el puño
-  const o = tip.distanceTo(wrist) / palm;                       // ~1.0 puño … ~1.9 mano abierta
+  const palm = palm2 / Math.max(0.45, ru);                       // largo real de la palma (sin el escorzo)
+  const o = tip.distanceTo(wrist) / Math.max(1, upv.length());   // ~1.0 puño … ~1.9 mano abierta
   const target = THREE.MathUtils.clamp(0.74 + (o-1.0)/(1.9-1.0)*(1.12-0.74), 0.74, 1.14);
   openK += (target - openK)*0.25; if (!glove3.isGLB) glove3.setOpenness(openK);
-  // Tamaño de la mano: el mayor entre el largo de la palma y el ancho de los nudillos × 1,3 (así no se achica
-  // cuando la mano se inclina) y suavizado aparte para que no "respire".
-  const ref = Math.max(palm, idx.distanceTo(pky) * CONFIG.fit.widthToLength);
+  // Tamaño de la mano: el mayor entre el largo de la palma y el ancho de los nudillos × 1,3, los dos corregidos por la
+  // inclinación, y suavizado aparte para que no "respire".
+  const ref = Math.max(palm, acr2 / Math.max(0.45, ra) * CONFIG.fit.widthToLength);
   if (!sizeF) sizeF = oneEuro(0.6, 0.004);
   const handRef = sizeF(ref, performance.now());
   // 1 unidad del modelo = 12,6 cm del guante escaneado; palma (muñeca a nudillo medio) ≈ 10,5 cm → 1,2 palmas por unidad
   const s = handRef * CONFIG.fit.unitsPerPalm * (CONFIG.ozScale[S.ozTry] || 1);
   const center = wrist.clone().addScaledVector(up, s*(0.67 - CONFIG.fit.wristY));
   stage.updateShadow(center, up, s, true);
+  // Puño articulado: la dirección del antebrazo en la imagen se aplica como giro en el plano de la pantalla
+  // sobre la dirección del puño (−up); el giro se pasa al espacio del modelo y se dobla suave en la muñeca.
+  const th = -FA.ang;                                            // ángulo con y hacia arriba
+  const d0 = up.clone().negate(), cz = Math.cos(th), sz = Math.sin(th);
+  const f3 = new THREE.Vector3(d0.x*cz - d0.y*sz, d0.x*sz + d0.y*cz, d0.z).normalize();
+  const fl = new THREE.Vector3(f3.dot(xl) * thumbSign, f3.dot(up), f3.dot(back)).normalize();
+  const qb = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), fl);
+  const wy = CONFIG.fit.wristY; G3.setBend(qb, wy, wy - 0.16, wy + 0.10);
   // la muñeca queda a la altura del borde superior del puño del guante (y = wristY en el modelo)
-  const org = wrist.clone().addScaledVector(up, -s*CONFIG.fit.wristY);
-  const m = new THREE.Matrix4().makeBasis(xl.multiplyScalar(s), up.multiplyScalar(s), back.multiplyScalar(s));
+  const org = wrist.clone().addScaledVector(up, -s*wy);
+  const m = new THREE.Matrix4().makeBasis(xl.clone().multiplyScalar(s), up.clone().multiplyScalar(s), back.clone().multiplyScalar(s));
   m.setPosition(org.x, org.y, org.z);
   glove3.root.matrix.copy(m); glove3.root.matrixWorldNeedsUpdate = true;
   glove3.root.visible = true;
+  // Sombra de contacto sobre el brazo, justo debajo del borde del puño (en la dirección del antebrazo)
+  const cuffLen = (wy - (-0.5)) * s, end = wrist.clone().addScaledVector(f3, cuffLen);
+  const ex = end.x + f3.x*s*0.05, ey = -(end.y + f3.y*s*0.05), ang = Math.atan2(-f3.y, f3.x);
+  const strength = 0.22 + 0.2*FA.conf;
+  bctx.save(); bctx.translate(ex, ey); bctx.rotate(ang); bctx.scale(0.24*s, 0.46*s);
+  const gsh = bctx.createRadialGradient(0, 0, 0, 0, 0, 1); gsh.addColorStop(0, `rgba(20,12,8,${strength})`); gsh.addColorStop(0.6, `rgba(20,12,8,${strength*0.45})`); gsh.addColorStop(1, 'rgba(20,12,8,0)');
+  bctx.globalCompositeOperation = 'multiply'; bctx.fillStyle = gsh; bctx.beginPath(); bctx.arc(0, 0, 1, 0, Math.PI*2); bctx.fill(); bctx.restore();
+  // velocidad del guante en pantalla (para el desenfoque de movimiento)
+  if (mb.t && now > mb.t){ const dt = (now - mb.t)/1000, vx = (center.x - mb.x)/dt, vy = -(center.y - mb.y)/dt; mb.vx += (vx - mb.vx)*0.6; mb.vy += (vy - mb.vy)*0.6; }
+  mb.x = center.x; mb.y = center.y; mb.t = now;
   // pines: 1 en el puño (lado del meñique) y 2 arriba del acolchado (lado del pulgar), en coordenadas del guante
   const at = (x, y) => { const q = new THREE.Vector3(x*thumbSign, y, 0).applyMatrix4(m); return [q.x, -q.y]; };
   const [p1x,p1y] = at(-0.62, 0.16), [p2x,p2y] = at(0.48, 1.62);
@@ -1072,8 +1188,8 @@ function takePhoto(){
   if (view.mirror){ g.translate(w,0); g.scale(-1,1); }
   if (synced){ g.restore(); g.drawImage(bg, 0, 0, w, h); }
   else { g.drawImage(video, view.ox*dpr, view.oy*dpr, view.vw*view.scale*dpr, view.vh*view.scale*dpr); g.restore(); }
-  renderer3.render(scene3, cam3);
-  g.drawImage(glCanvas, 0, 0, w, h);
+  renderer3.render(scene3, cam3); composeGlove(performance.now());
+  g.drawImage(fx, 0, 0, w, h);
   // Marca como en el UI Kit: TEMPO arriba a la izquierda; modelo y hashtag abajo a la izquierda
   const pad = Math.round(w*0.05), fs = Math.round(Math.min(w,h)*0.05);
   let grd = g.createLinearGradient(0,0,0,h*0.18); grd.addColorStop(0,'rgba(0,0,0,.55)'); grd.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=grd; g.fillRect(0,0,w,h*0.18);

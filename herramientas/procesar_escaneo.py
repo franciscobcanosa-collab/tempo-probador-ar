@@ -126,11 +126,12 @@ def main(out_prefix, src):
 
     # diseño de Tempo (emblema, placa, emblema lateral, ojales): ver detalles_escaneo.py
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from detalles_escaneo import details
+    from detalles_escaneo import details, open_cuff
     decals, eyes, info = details(V, N, F)
+    F, opening, ncut = open_cuff(V, F)          # abertura del puño por donde entra el brazo
     yb = lambda mm: mm * s + CUFF_BOTTOM
     meta = dict(version=1, units='palma', scan=CREDIT, uvScale=uvscale, pivot=0.40, cuffY0=CUFF_BOTTOM, cuffY1=yb(88),
-                counts=dict(v=len(V), f=len(F)), seams=[], decals=decals, eyelets=eyes, strapRings=[], design='tempo-1')
+                counts=dict(v=len(V), f=len(F)), seams=[], decals=decals, eyelets=eyes, strapRings=[], design='tempo-1', cuffOpening=opening)
     with open(out_prefix + '.bin', 'wb') as fh:
         fh.write(V.tobytes()); fh.write((N * 32767).astype(np.int16).tobytes()); fh.write(uvs.astype(np.float32).tobytes())
         fh.write((A * 255).astype(np.uint8).tobytes())
