@@ -144,7 +144,7 @@ def main(out_prefix, src):
         return dict(nx=nx, ny=ny, w=w, h=h, side=side, pts=np.concatenate([P, Nn], 1).round(5).tolist())
     # zona plana del dorso, arriba del abrojo, y sobre la faja de abrojo
     yb = lambda mm: mm * s + CUFF_BOTTOM
-    decals = dict(logo=decal_grid(0.0, yb(175), 0.60, 0.18), cuffLogo=decal_grid(0.0, yb(48), 0.40, 0.12))
+    decals = dict(logo=decal_grid(-0.13, yb(236), 0.52, 0.16), cuffLogo=decal_grid(-0.18, yb(46), 0.34, 0.10))
     meta = dict(version=1, units='palma', scan=CREDIT, uvScale=uvscale, pivot=0.40, cuffY0=CUFF_BOTTOM, cuffY1=yb(88),
                 counts=dict(v=len(V), f=len(F)), seams=[], decals=decals, eyelets=[], strapRings=[])
     with open(out_prefix + '.bin', 'wb') as fh:
