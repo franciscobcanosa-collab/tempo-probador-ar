@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111113">
+<title>Tempo · Probador AR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: una pantalla por paso, mobile-first; la vista de cámara ocupa todo y la interfaz flota encima. */
+:root{
+  --bg:#111113; --surface:#1C1C1C; --surface-2:#262523; --line:#3A3631;
+  --fg:#F4EFE6; --muted:#A89F92; --accent:#F2B865; --accent-ink:#1C1405;
+  --ok:#3FBF6F; --warn:#F2B865; --err:#E8796A;
+  --display:'Archivo Black','Arial Black',Impact,sans-serif;
+  --body:'Archivo',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  --r:18px; color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+[tabindex="-1"]:focus{outline:none}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;-webkit-font-smoothing:antialiased}
+body{overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;overflow-y:auto;
+  padding:calc(env(safe-area-inset-top,0px) + 18px) max(18px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 18px) max(18px,env(safe-area-inset-left,0px));
+  background:var(--bg)}
+.screen[hidden]{display:none!important}
+.wrap{width:100%;max-width:460px;margin:0 auto;display:flex;flex-direction:column;gap:18px;flex:1}
+.top{display:flex;align-items:center;gap:12px;min-height:44px}
+.top .ttl{flex:1;text-align:center;font-weight:600;font-size:15px;color:var(--muted)}
+.icon-btn{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:rgba(17,17,19,.72);display:grid;place-items:center;flex:none;backdrop-filter:blur(8px)}
+.icon-btn svg{width:20px;height:20px}
+.spacer{width:44px;flex:none}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700}
+h1,h2{font-family:var(--display);font-weight:400;text-transform:uppercase;line-height:1.02;margin:0;text-wrap:balance}
+h1{font-size:clamp(36px,10vw,48px)} h2{font-size:clamp(26px,7.4vw,34px)}
+p{margin:0;line-height:1.5}
+.lead{color:#D9D1C4}
+.muted{color:var(--muted);font-size:14px}
+.brand{font-family:var(--display);letter-spacing:.2em;color:var(--accent);font-size:15px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:54px;border-radius:999px;border:0;
+  background:var(--accent);color:var(--accent-ink);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:15px;padding:0 22px}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+.btn.quiet{background:transparent;color:var(--fg);border:1px solid var(--line);text-transform:none;letter-spacing:0;font-weight:600}
+.link{background:none;border:0;color:var(--fg);text-decoration:underline;text-underline-offset:3px;font-weight:600;padding:10px;align-self:center}
+.footer{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:12px}
+/* intro */
+.hero-glove{height:min(38vh,320px);border-radius:var(--r);background:radial-gradient(ellipse at 50% 35%,#3A2414 0%,#1A1513 55%,#111113 100%);position:relative;overflow:hidden}
+.hero-glove canvas{position:absolute;inset:0;width:100%;height:100%}
+.steps{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+.steps li{display:flex;gap:12px;align-items:center}
+.steps b{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-size:13px;flex:none}
+.privacy{display:flex;gap:8px;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
+.privacy svg{width:14px;height:14px}
+/* progress */
+.progress{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.progress i{height:4px;border-radius:4px;background:var(--line)}
+.progress i.on{background:var(--accent)}
+/* options */
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:16px;border-radius:var(--r);border:1.5px solid var(--line);background:var(--surface)}
+.opt .ic{width:44px;height:44px;border-radius:12px;background:var(--surface-2);display:grid;place-items:center;font-family:var(--display);color:var(--accent);flex:none;font-size:14px}
+.opt .tx{flex:1;min-width:0}
+.opt .tx strong{display:block;font-size:17px}
+.opt .tx span{color:var(--muted);font-size:14px}
+.opt .rd{width:22px;height:22px;border-radius:50%;border:2px solid var(--muted);flex:none;display:grid;place-items:center}
+.opt[aria-checked="true"]{border-color:var(--accent);background:linear-gradient(180deg,#2B2014,#1F1A14)}
+.opt[aria-checked="true"] .rd{border-color:var(--accent)}
+.opt[aria-checked="true"] .rd::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.chosen{font-size:14px;color:var(--muted)} .chosen b{color:var(--accent);font-weight:600}
+/* recommendation */
+.reco{display:flex;gap:16px;align-items:center;padding:18px;border-radius:var(--r);border:1.5px solid var(--accent);background:linear-gradient(180deg,#2B2014,#1C1814)}
+.reco .oz{font-family:var(--display);font-size:56px;line-height:1;color:var(--fg);white-space:nowrap} .reco .oz small{font-size:20px;color:var(--accent)}
+.reco .why{font-size:14px;color:#D9D1C4} .reco .why b{display:block;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;font-size:12px;margin-bottom:4px}
+.notice{display:flex;gap:10px;padding:12px 14px;border-radius:14px;background:#2A2215;border:1px solid #5A4520;font-size:14px;color:#EBDDC4}
+.notice svg{flex:none;width:18px;height:18px;margin-top:2px;color:var(--accent)}
+.model{display:flex;gap:12px;align-items:center;padding:12px;border-radius:var(--r);border:1.5px solid var(--line);background:var(--surface);width:100%;text-align:left}
+.model[aria-checked="true"]{border-color:var(--accent)}
+.model canvas{width:64px;height:64px;border-radius:12px;background:#0C0C0D;flex:none}
+.model .tx{flex:1;min-width:0}
+.model strong{font-size:16px} .model .tag{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--accent-ink);background:var(--accent);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:2px}
+.model .meta{font-size:13px;color:var(--muted)} .model .stock{font-size:13px;color:var(--ok)}
+.model .price{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* camera permission sheet */
+.sheet{margin-top:auto;background:var(--surface);border:1px solid var(--line);border-radius:28px;padding:22px;display:flex;flex-direction:column;gap:14px;text-align:center}
+.sheet .badge{width:56px;height:56px;border-radius:50%;border:1.5px solid var(--accent);display:grid;place-items:center;margin:0 auto;color:var(--accent)}
+.sheet .badge svg{width:26px;height:26px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:var(--surface-2);font-size:13px;color:#D9D1C4;align-self:center}
+.pill svg{width:13px;height:13px}
+/* camera view */
+#s-cam{padding:0;background:#000;overflow:hidden}
+#stage{position:absolute;inset:0;overflow:hidden;background:#000}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#video.mirror{transform:scaleX(-1)}
+#gl,#dots{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.cam-ui{position:absolute;inset:0;display:flex;flex-direction:column;pointer-events:none;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) max(12px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 12px) max(12px,env(safe-area-inset-left,0px))}
+.cam-ui > *{pointer-events:auto}
+.cam-top{display:flex;align-items:center;gap:8px}
+.cam-top .grow{flex:1;display:flex;justify-content:center}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border-radius:999px;background:rgba(17,17,19,.78);border:1px solid var(--line);font-size:13px;font-weight:600;backdrop-filter:blur(8px)}
+.chip .led{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.chip.ok .led{background:var(--ok)} .chip.warn .led{background:var(--warn)} .chip.err .led{background:var(--err)}
+.chip.ok{border-color:#2F6B45} .chip.warn{border-color:#5A4520}
+.side-tools{position:absolute;right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 70px);display:flex;flex-direction:column;gap:10px}
+.reco-chip{align-self:flex-start;margin-top:10px;background:rgba(47,107,69,.9);border-color:#3D8A59;color:#E9F7EE}
+.frame{position:absolute;left:12%;right:12%;top:18%;bottom:30%;pointer-events:none}
+.frame i{position:absolute;width:34px;height:34px;border-color:var(--accent);border-style:solid;border-width:0}
+.frame i:nth-child(1){left:0;top:0;border-top-width:3px;border-left-width:3px;border-top-left-radius:10px}
+.frame i:nth-child(2){right:0;top:0;border-top-width:3px;border-right-width:3px;border-top-right-radius:10px}
+.frame i:nth-child(3){left:0;bottom:0;border-bottom-width:3px;border-left-width:3px;border-bottom-left-radius:10px}
+.frame i:nth-child(4){right:0;bottom:0;border-bottom-width:3px;border-right-width:3px;border-bottom-right-radius:10px}
+.scan-card{margin-top:auto;background:rgba(28,28,28,.94);border:1px solid var(--line);border-radius:24px;padding:18px;display:flex;flex-direction:column;gap:12px;backdrop-filter:blur(10px)}
+.scan-card h3{margin:0;font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:20px}
+.meter{height:5px;border-radius:5px;background:var(--line);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--surface-2);border-radius:12px;padding:8px 10px}
+.stat span{display:block;font-size:11px;color:var(--muted)} .stat b{font-size:14px;font-variant-numeric:tabular-nums}
+.stat b.ok{color:var(--ok)} .stat b.warn{color:var(--warn)}
+.tips{margin:0;padding-left:18px;color:#D9D1C4;font-size:14px;line-height:1.5}
+.tryon{margin-top:auto;background:rgba(28,28,28,.95);border:1px solid var(--line);border-radius:26px;padding:14px;display:flex;flex-direction:column;gap:12px;backdrop-filter:blur(10px)}
+.tryon .prod{display:flex;align-items:center;gap:12px}
+.tryon .prod canvas{width:48px;height:48px;border-radius:10px;background:#0C0C0D;flex:none}
+.tryon .prod .tx{flex:1;min-width:0} .tryon .prod strong{display:block} .tryon .prod span{font-size:13px;color:var(--muted)}
+.row{display:flex;align-items:center;gap:10px}
+.swatch{width:34px;height:34px;border-radius:9px;border:2px solid var(--line);padding:0}
+.swatch[aria-checked="true"]{border-color:var(--accent);box-shadow:0 0 0 2px #111113 inset}
+.oz-chip{margin-left:auto;padding:6px 12px;border-radius:999px;border:1.5px solid var(--accent);color:var(--accent);font-weight:700;font-size:13px}
+.buy-row{display:flex;align-items:center;gap:12px}
+.buy-row .price{flex:1;min-width:0} .buy-row .price b{display:block;font-size:18px;font-variant-numeric:tabular-nums} .buy-row .price span{font-size:12px;color:var(--ok)}
+.shutter{width:64px;height:64px;border-radius:50%;border:4px solid var(--fg);background:rgba(255,255,255,.18);flex:none;position:relative}
+.shutter::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--fg)}
+.timer-btn{min-width:44px;height:44px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);font-size:13px;font-weight:700;padding:0 10px}
+.timer-btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.buy{min-height:48px;width:auto;padding:0 20px;font-size:14px}
+.countdown{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);font-size:120px;color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.6);pointer-events:none}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
+.cam-ui.clean .hide-clean{display:none!important}
+.clean-hint{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);transform:translateX(-50%);font-size:13px}
+/* photo, cart */
+.photo{width:100%;border-radius:var(--r);border:1px solid var(--line);display:block;background:#000;max-height:58vh;object-fit:contain}
+.actions3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.act{color:var(--fg);text-decoration:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:14px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:600}
+.act svg{width:22px;height:22px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px}
+.line{display:flex;justify-content:space-between;gap:10px;font-variant-numeric:tabular-nums}
+.ok-badge{width:60px;height:60px;border-radius:50%;border:1.5px solid var(--accent);display:grid;place-items:center;color:var(--accent);margin:0 auto}
+.ok-badge svg{width:28px;height:28px}
+.upsell{display:flex;align-items:center;gap:12px;border:1px dashed #5A4520;border-radius:14px;padding:12px}
+.upsell .tx{flex:1;font-size:14px}
+.upsell button{background:none;border:0;color:var(--accent);font-weight:700}
+/* viewer */
+#viewer3d{flex:1;min-height:320px;border-radius:var(--r);background:radial-gradient(ellipse at 50% 40%,#2C1E14 0%,#141312 70%);position:relative;overflow:hidden;touch-action:none}
+#viewer3d canvas{position:absolute;inset:0;width:100%;height:100%}
+.drag-hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);font-size:13px;color:var(--muted);pointer-events:none}
+/* overlay: ayuda y errores */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:max(12px,env(safe-area-inset-left,0px))}
+.overlay[hidden]{display:none!important}
+.overlay .sheet{width:100%;max-width:460px;text-align:left;margin:0 0 env(safe-area-inset-bottom,0px)}
+.overlay .sheet h2{font-size:24px}
+.hand-anim{width:84px;height:84px;margin:0 auto;color:var(--accent)}
+.hand-anim .open{animation:open 2.4s infinite} .hand-anim .fist{animation:fist 2.4s infinite}
+@keyframes open{0%,45%{opacity:1}55%,100%{opacity:0}} @keyframes fist{0%,45%{opacity:0}55%,100%{opacity:1}}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);background:var(--surface-2);border:1px solid var(--line);padding:12px 16px;border-radius:14px;font-size:14px;z-index:30;max-width:90vw}
+.loading{display:flex;flex-direction:column;align-items:center;gap:14px;justify-content:center;flex:1;text-align:center}
+.spin{width:40px;height:40px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp 0.9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin,.hand-anim .open,.hand-anim .fist{animation:none}.hand-anim .fist{opacity:0}}
+@media (min-width:900px){ .cam-ui .scan-card,.cam-ui .tryon{max-width:440px;align-self:flex-start} }
+</style>
+</head>
+<body>
+
+<!-- SVG icons -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 10V7a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-flip" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0114-5l2 2M20 12a8 8 0 01-14 5l-2-2M20 4v5h-5M4 20v-5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1.1-1.5 2.3M12 17h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v6M12 7.5h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 12v7h14v-7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+</svg>
+
+<!-- 1 · Intro -->
+<section class="screen" id="s-intro" aria-labelledby="t-intro">
+  <div class="wrap">
+    <div class="top"><span class="brand">TEMPO</span></div>
+    <div class="hero-glove" id="hero"></div>
+    <div class="eyebrow">Realidad aumentada</div>
+    <h1 id="t-intro">Probalo en tu mano</h1>
+    <p class="lead">Contanos cómo entrenás y cuánto pesás: te recomendamos las onzas y te probás el guante con la cámara.</p>
+    <ol class="steps">
+      <li><b>1</b>Dos preguntas para elegir tus onzas</li>
+      <li><b>2</b>Mostrá tu mano a la cámara</li>
+      <li><b>3</b>Mirá el guante puesto y elegí</li>
+    </ol>
+    <div class="footer">
+      <button class="btn" data-go="s-q1">Empezar</button>
+      <button class="link" id="know-oz">Ya sé mis onzas</button>
+      <div class="notice" id="file-notice" hidden><svg><use href="#i-info"/></svg><span>Abriste el archivo directamente: las preguntas funcionan, pero para usar la cámara hay que abrirlo desde un servidor o una dirección https. Mirá el archivo LEEME.</span></div>
+      <p class="privacy"><svg><use href="#i-lock"/></svg>No guardamos fotos ni video de tu cámara.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2 · Pregunta 1 -->
+<section class="screen" id="s-q1" hidden aria-labelledby="t-q1">
+  <div class="wrap">
+    <div class="top"><button class="icon-btn" data-go="s-intro" aria-label="Volver"><svg><use href="#i-back"/></svg></button><div class="ttl">Pregunta 1 de 2</div><span class="spacer"></span></div>
+    <div class="progress" aria-hidden="true"><i class="on"></i><i></i></div>
+    <div class="eyebrow">Tu entrenamiento</div>
+    <h2 id="t-q1">¿Para qué vas a usar los guantes?</h2>
+    <p class="muted">Las onzas cambian según el uso: para sparring se usa un guante más acolchado, que cuida tu mano y la de tu compañero.</p>
+    <div class="opts" role="radiogroup" aria-labelledby="t-q1" id="opts-uso">
+      <button class="opt" role="radio" aria-checked="false" data-val="sparring"><span class="ic">VS</span><span class="tx"><strong>Sparring</strong><span>Guanteo con un compañero, peleas</span></span><span class="rd"></span></button>
+      <button class="opt" role="radio" aria-checked="false" data-val="entrenamiento"><span class="ic">BOL</span><span class="tx"><strong>Entrenamiento</strong><span>Bolsa, manoplas, técnica y clases</span></span><span class="rd"></span></button>
+    </div>
+    <div class="footer"><button class="btn" id="q1-next" disabled>Siguiente</button></div>
+  </div>
+</section>
+
+<!-- 3 · Pregunta 2 -->
+<section class="screen" id="s-q2" hidden aria-labelledby="t-q2">
+  <div class="wrap">
+    <div class="top"><button class="icon-btn" data-go="s-q1" aria-label="Volver"><svg><use href="#i-back"/></svg></button><div class="ttl">Pregunta 2 de 2</div><span class="spacer"></span></div>
+    <div class="progress" aria-hidden="true"><i class="on"></i><i class="on"></i></div>
+    <div class="eyebrow">Lo más importante</div>
+    <h2 id="t-q2">¿Cuánto pesás?</h2>
+    <p class="muted">Tu peso corporal es lo que más define las onzas del guante.</p>
+    <div class="opts" role="radiogroup" aria-labelledby="t-q2" id="opts-peso">
+      <button class="opt" role="radio" aria-checked="false" data-val="0"><span class="tx"><strong>Menos de 55 kg</strong></span><span class="rd"></span></button>
+      <button class="opt" role="radio" aria-checked="false" data-val="1"><span class="tx"><strong>55 a 70 kg</strong></span><span class="rd"></span></button>
+      <button class="opt" role="radio" aria-checked="false" data-val="2"><span class="tx"><strong>70 a 85 kg</strong></span><span class="rd"></span></button>
+      <button class="opt" role="radio" aria-checked="false" data-val="3"><span class="tx"><strong>Más de 85 kg</strong></span><span class="rd"></span></button>
+    </div>
+    <p class="chosen">Uso elegido: <b id="uso-label">—</b></p>
+    <div class="footer"><button class="btn" id="q2-next" disabled>Ver mi recomendación</button></div>
+  </div>
+</section>
+
+<!-- 4 · Recomendación -->
+<section class="screen" id="s-reco" hidden aria-labelledby="t-reco">
+  <div class="wrap">
+    <div class="top"><button class="icon-btn" id="reco-back" aria-label="Volver"><svg><use href="#i-back"/></svg></button><div class="ttl" id="t-reco">Tu recomendación</div><span class="spacer"></span></div>
+    <div class="reco" id="reco-box"></div>
+    <div class="notice" id="oz-notice" hidden><svg><use href="#i-info"/></svg><span id="oz-notice-tx"></span></div>
+    <p class="muted">Elegí qué guante probarte</p>
+    <div class="opts" role="radiogroup" aria-label="Modelos" id="models"></div>
+    <div class="footer"><button class="btn" id="reco-next">Probarme el guante</button><p class="muted" style="text-align:center">Guía orientativa: si tenés dudas, consultá con tu entrenador.</p></div>
+  </div>
+</section>
+
+<!-- 5 · Permiso de cámara -->
+<section class="screen" id="s-perm" hidden aria-labelledby="t-perm" style="background:radial-gradient(ellipse at 50% 20%,#2C1E14 0%,#111113 65%)">
+  <div class="wrap">
+    <div class="top"><button class="icon-btn" data-go="s-reco" aria-label="Volver"><svg><use href="#i-back"/></svg></button><span style="flex:1"></span></div>
+    <div class="sheet">
+      <div class="badge"><svg><use href="#i-cam"/></svg></div>
+      <h2 id="t-perm">Necesitamos tu cámara</h2>
+      <p class="lead">Usamos la cámara solo para detectar tu mano y mostrarte el guante encima, en tiempo real. Todo pasa en tu dispositivo.</p>
+      <span class="pill"><svg><use href="#i-lock"/></svg>No grabamos ni guardamos imágenes</span>
+      <button class="btn" id="perm-yes">Permitir cámara</button>
+      <button class="btn ghost" id="perm-no">Ahora no, ver en 3D</button>
+    </div>
+  </div>
+</section>
+
+<!-- 6/7 · Cámara: escaneo y guante puesto -->
+<section class="screen" id="s-cam" hidden aria-label="Probador con cámara">
+  <div id="stage">
+    <video id="video" playsinline muted autoplay></video>
+    <canvas id="dots"></canvas>
+    <canvas id="gl"></canvas>
+    <div class="frame" id="frame"><i></i><i></i><i></i><i></i></div>
+    <div class="countdown" id="countdown" hidden></div>
+    <div class="flash" id="flash"></div>
+  </div>
+  <div class="cam-ui" id="cam-ui">
+    <div class="cam-top hide-clean">
+      <button class="icon-btn" id="cam-back" aria-label="Salir del probador"><svg><use href="#i-back"/></svg></button>
+      <div class="grow"><span class="chip" id="status-chip" role="status" aria-live="polite"><span class="led"></span><span id="status-tx">Iniciando cámara…</span></span></div>
+      <button class="icon-btn" id="cam-help" aria-label="Ayuda"><svg><use href="#i-help"/></svg></button>
+    </div>
+    <span class="chip reco-chip hide-clean" id="reco-chip" hidden></span>
+    <div class="side-tools hide-clean">
+      <button class="icon-btn" id="cam-flip" aria-label="Cambiar de cámara"><svg><use href="#i-flip"/></svg></button>
+      <button class="icon-btn" id="cam-clean" aria-label="Ocultar la interfaz" hidden><svg><use href="#i-eye"/></svg></button>
+    </div>
+
+    <!-- tarjeta de escaneo -->
+    <div class="scan-card hide-clean" id="scan-card">
+      <h3 id="scan-title">Mostrá tu mano</h3>
+      <p class="muted" id="scan-sub">Palma abierta, dedos separados y la mano entera dentro del marco. Después cerrá el puño.</p>
+      <div class="meter"><i id="scan-meter"></i></div>
+      <div class="stats">
+        <div class="stat"><span>Luz</span><b id="st-light">—</b></div>
+        <div class="stat"><span>Distancia</span><b id="st-dist">—</b></div>
+        <div class="stat"><span>Puntos</span><b id="st-pts">0/21</b></div>
+      </div>
+      <div id="scan-error" hidden>
+        <ul class="tips" id="scan-tips"></ul>
+        <div class="row" style="margin-top:10px"><button class="btn quiet" id="scan-retry">Reintentar</button><button class="btn quiet" data-go="s-viewer">Ver en 3D</button></div>
+      </div>
+    </div>
+
+    <!-- hoja del guante puesto -->
+    <div class="tryon hide-clean" id="tryon" hidden>
+      <div class="prod"><canvas id="thumb-cam" width="96" height="96"></canvas><div class="tx"><strong id="to-name">Tempo Elite</strong><span id="to-desc"></span></div></div>
+      <div class="row" role="radiogroup" aria-label="Color" id="to-colors"></div>
+      <div class="buy-row">
+        <div class="price"><b id="to-price"></b><span id="to-stock"></span></div>
+        <button class="timer-btn" id="timer-btn" aria-pressed="false" aria-label="Temporizador de 3 segundos">3 s</button>
+        <button class="shutter" id="shutter" aria-label="Sacar foto"></button>
+        <button class="btn buy" id="to-buy">Comprar</button>
+      </div>
+    </div>
+    <button class="chip clean-hint" id="clean-exit" hidden>Mostrar controles</button>
+  </div>
+</section>
+
+<!-- 8 · Foto -->
+<section class="screen" id="s-photo" hidden aria-labelledby="t-photo">
+  <div class="wrap">
+    <div class="top"><button class="icon-btn" id="photo-back" aria-label="Volver al probador"><svg><use href="#i-back"/></svg></button><div class="ttl" id="t-photo">Tu foto con Tempo</div><span class="spacer"></span></div>
+    <img class="photo" id="photo-img" alt="Foto con el guante Tempo puesto">
+    <div class="actions3">
+      <a class="act" id="photo-save" download="tempo-probador.jpg" href="#"><svg><use href="#i-down"/></svg>Guardar</a>
+      <button class="act" id="photo-share"><svg><use href="#i-share"/></svg>Compartir</button>
+      <button class="act" id="photo-redo"><svg><use href="#i-redo"/></svg>Repetir</button>
+    </div>
+    <div class="footer"><button class="btn" id="photo-cart">Agregar al carrito</button></div>
+  </div>
+</section>
+
+<!-- 9 · Carrito -->
+<section class="screen" id="s-cart" hidden aria-labelledby="t-cart">
+  <div class="wrap">
+    <div class="top"><span class="spacer"></span><span style="flex:1"></span><button class="icon-btn" id="cart-close" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>
+    <div class="ok-badge"><svg><use href="#i-check"/></svg></div>
+    <h2 id="t-cart" style="text-align:center">¡Agregado al carrito!</h2>
+    <div class="card">
+      <div class="line"><strong id="c-name"></strong><strong id="c-price"></strong></div>
+      <div class="muted" id="c-meta"></div>
+      <div class="line muted"><span id="c-cuotas"></span></div>
+      <div class="line" style="color:var(--accent);font-size:14px"><span id="c-transfer"></span></div>
+    </div>
+    <div class="upsell"><div class="tx">Sumá las <b>Tempo Wraps</b> (3,5 m) · <span id="c-wraps"></span></div><button id="add-wraps">+ Agregar</button></div>
+    <div class="footer">
+      <button class="btn" id="cart-checkout">Finalizar compra</button>
+      <button class="btn ghost" id="cart-more">Seguir probando</button>
+      <p class="muted" style="text-align:center">Envíos con Andreani o retiro en punto TEMPO.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Visor 3D sin cámara -->
+<section class="screen" id="s-viewer" hidden aria-labelledby="t-viewer">
+  <div class="wrap">
+    <div class="top"><button class="icon-btn" id="viewer-back" aria-label="Volver"><svg><use href="#i-back"/></svg></button><div class="ttl" id="t-viewer">Visor 3D</div><span class="spacer"></span></div>
+    <div id="viewer3d"><span class="drag-hint">Arrastrá para girar el guante</span></div>
+    <div class="card">
+      <div class="line"><strong id="v-name"></strong><strong id="v-price"></strong></div>
+      <div class="row" role="radiogroup" aria-label="Color" id="v-colors"></div>
+    </div>
+    <div class="footer">
+      <button class="btn" id="viewer-cam">Probar con la cámara</button>
+      <button class="btn ghost" id="viewer-buy">Agregar al carrito</button>
+    </div>
+  </div>
+</section>
+
+<!-- Pantalla de carga / error -->
+<section class="screen" id="s-msg" hidden aria-live="polite">
+  <div class="wrap">
+    <div class="top"><button class="icon-btn" id="msg-back" aria-label="Volver"><svg><use href="#i-back"/></svg></button><span style="flex:1"></span></div>
+    <div class="loading" id="msg-loading"><div class="spin"></div><p id="msg-loading-tx">Cargando el detector de manos…</p></div>
+    <div class="sheet" id="msg-error" hidden>
+      <div class="badge" style="border-color:var(--err);color:var(--err)"><svg><use href="#i-info"/></svg></div>
+      <h2 id="msg-title"></h2>
+      <p class="lead" id="msg-text"></p>
+      <ul class="tips" id="msg-steps" style="text-align:left"></ul>
+      <div id="msg-actions" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Ayuda -->
+<div class="overlay" id="help" hidden role="dialog" aria-modal="true" aria-labelledby="t-help">
+  <div class="sheet">
+    <svg class="hand-anim" viewBox="0 0 64 64" aria-hidden="true">
+      <g class="open" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M22 52c-6-6-10-12-10-18l4-4 6 6V12a3 3 0 016 0v18-22a3 3 0 016 0v22-18a3 3 0 016 0v20-12a3 3 0 016 0v20c0 8-4 14-10 16H26"/></g>
+      <g class="fist" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><rect x="16" y="20" width="32" height="24" rx="10"/><path d="M24 20v10M32 20v10M40 20v10M16 32h-2a4 4 0 010-8h4M24 44v8h16v-8"/></g>
+    </svg>
+    <h2 id="t-help">Cómo probarte el guante</h2>
+    <ul class="tips">
+      <li>Usá la cámara trasera y mostrá tu otra mano, o la frontal en la compu.</li>
+      <li>Primero palma abierta dentro del marco; después cerrá el puño.</li>
+      <li>Buscá buena luz y que la mano no quede cortada.</li>
+      <li>Para la foto, activá el temporizador de 3 s: así no necesitás tocar la pantalla con la mano que estás probando.</li>
+      <li>Tocá el ojo para ocultar los controles y ver solo el guante.</li>
+    </ul>
+    <button class="btn" id="help-close">Entendido</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script type="importmap">{"imports":{"three":"./vendor/three/three.module.min.js","three/addons/":"./vendor/three/addons/"}}</script>
+<script src="vendor/mediapipe-hands/hands.js"></script>
+<script>
+"use strict";
+/* ================= CONFIG: datos del catálogo (tomados del MVP de Tempo) ================= */
+const CONFIG = {
+  models: {
+    elite: { name:'Tempo Elite', cierre:'cordones', desc:'Cordones · Peleas y sparring de alto nivel', material:'Cuero genuino', price:209999 },
+    pro:   { name:'Tempo Pro',   cierre:'velcro',   desc:'Velcro reforzado · Entrenamiento diario y sparring', material:'Cuero', price:168999 },
+    fit:   { name:'Tempo Fit',   cierre:'velcro',   desc:'Velcro ajustable · Clases y principiantes', material:'Sintético', price:132999 }
+  },
+  // Talles con stock por modelo. En el MVP todos figuran en 16 oz: actualizar cuando haya más talles.
+  stock: { elite:[16], pro:[16], fit:[16] },
+  colors: { blanco:{label:'Blanco', leather:'#E9E2D4', trim:'#D6CDBD', thread:'#EFE9DE', lace:'#F4EFE6', logo:'#C9A24A'},
+            negro:{label:'Negro',  leather:'#151413', trim:'#2B2927', thread:'#3A3734', lace:'#151515', logo:'#D8B260'} },
+  // Modelos 3D escaneados (opcional). Ej.: elite: { blanco:'models/elite-blanco.glb', negro:'models/elite-negro.glb' }
+  glbFit: { up:'y', back:'z', thumb:1, length:2.37, wrist:0.22 },
+  wraps: 24999,
+  transferOff: 0.10,
+  cuotas: 3,
+  // Guía orientativa de onzas por uso y rango de peso (índices: <55, 55-70, 70-85, >85)
+  ozGuide: { sparring:[14,16,16,16], entrenamiento:[10,12,14,16] },
+  ozScale: { 10:0.92, 12:0.96, 14:1.0, 16:1.05 }
+};
+const PESOS = ['menos de 55 kg','55 a 70 kg','70 a 85 kg','más de 85 kg'];
+
+const S = { uso:null, peso:null, ozRec:16, ozTry:16, model:'elite', color:'blanco', facing:null, timer:false, knowOz:false };
+
+/* ================= Utilidades ================= */
+const $ = (id) => document.getElementById(id);
+const money = (n, dec=false) => '$ ' + new Intl.NumberFormat('es-AR',{minimumFractionDigits:dec?2:0, maximumFractionDigits:dec?2:0}).format(n);
+const isTouch = matchMedia('(pointer: coarse)').matches;
+const HAS_HANDS = typeof Hands !== 'undefined';
+const IS_FILE = location.protocol === 'file:';
+const HAS_WEBGL = (() => { try { const c=document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch(_) { return false; } })();
+let THREE = null, G3 = null, CAN_3D = false;
+/* Guante dibujado en 2D: se usa si el 3D no está disponible */
+function drawGlove2D(canvas, colorKey){
+  const c = (CONFIG.colors[colorKey] || CONFIG.colors.blanco);
+  const g = canvas.getContext('2d'), W = canvas.width, H = canvas.height, k = Math.min(W,H)/100;
+  g.clearRect(0,0,W,H); g.save(); g.translate(W/2, H/2); g.scale(k,k);
+  g.fillStyle = c.trim; g.beginPath(); g.roundRect(-17, 10, 34, 34, 6); g.fill();
+  g.fillStyle = c.leather; g.beginPath(); g.ellipse(0, -8, 26, 32, 0, 0, Math.PI*2); g.fill();
+  g.beginPath(); g.ellipse(-22, 2, 8, 15, -0.5, 0, Math.PI*2); g.fill();
+  g.fillStyle = c.logo; g.font = '700 7px Archivo, Arial, sans-serif'; g.textAlign='center'; g.fillText('TEMPO', 2, -2);
+  g.restore();
+}
+/* El motor 3D se carga aparte: si falla (archivo abierto directamente, sin WebGL o sin la carpeta vendor), el resto de la app sigue andando */
+const ready3D = (async () => {
+  if (!HAS_WEBGL) return false;
+  try { G3 = await import('./glove3d.js'); THREE = G3.THREE; await G3.prepare(CONFIG); CAN_3D = true; return true; }
+  catch (e) { console.warn('3D no disponible:', e); return false; }
+})();
+ready3D.then(ok => { if (!ok) return; if (current === 's-intro') hero.start(); if (current === 's-reco') renderModels(); });
+let current = 's-intro';
+function go(id){
+  if (current === 's-cam' && id !== 's-cam') stopCamera();
+  if (current === 's-viewer' && id !== 's-viewer') viewer.stop();
+  document.querySelectorAll('.screen').forEach(s => s.hidden = s.id !== id);
+  current = id;
+  if (id === 's-intro') hero.start(); else hero.stop();
+  if (id === 's-viewer') viewer.start();
+  if (id === 's-intro') $('file-notice').hidden = !IS_FILE;
+  const h = $(id).querySelector('h1,h2,.ttl'); if (h) { h.setAttribute('tabindex','-1'); h.focus({preventScroll:true}); }
+}
+document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
+let toastT; function toast(msg){ const t=$('toast'); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,3200); }
+
+/* ================= Escena giratoria (intro y visor 3D) ================= */
+function turntable(container, { drag=false } = {}){
+  let renderer, studio, cam, glove=null, raf=null, built=false, failed=false, yaw=0.6, pitch=-0.12, auto=true, last=null, key=null, loading=false;
+  function fallback(){ failed=true; const fb=document.createElement('canvas'); fb.width=(container.clientWidth||200)*2; fb.height=(container.clientHeight||200)*2; container.prepend(fb); drawGlove2D(fb, S.color); }
+  function build(){
+    const canvas = document.createElement('canvas'); container.prepend(canvas);
+    renderer = G3.makeRenderer(canvas); studio = G3.createStudio(renderer);
+    cam = new THREE.PerspectiveCamera(30, 1, 0.1, 50); cam.position.set(0, 0.62, 5.8); cam.lookAt(0,0.62,0);
+    built = true;
+    if (drag){
+      canvas.style.touchAction='none';
+      canvas.addEventListener('pointerdown', e => { last=[e.clientX,e.clientY]; auto=false; canvas.setPointerCapture(e.pointerId); });
+      canvas.addEventListener('pointermove', e => { if(!last) return; yaw += (e.clientX-last[0])*0.01; pitch = Math.max(-0.9,Math.min(0.9,pitch+(e.clientY-last[1])*0.008)); last=[e.clientX,e.clientY]; });
+      const up = () => last=null; canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+    }
+  }
+  async function ensureGlove(){
+    if (glove && key===S.model){ glove.setColor(S.color); return; }
+    if (loading) return; loading = true;
+    const g = await G3.createGlove(S.model, S.color); loading = false;
+    if (glove) studio.scene.remove(glove.root);
+    glove = g; key = S.model; glove.setOpenness(0.82); glove.root.position.y = -0.05; studio.scene.add(glove.root);
+  }
+  function size(){ const w=container.clientWidth, h=container.clientHeight; if(!w||!h) return; renderer.setSize(w,h,false); cam.aspect=w/h; cam.updateProjectionMatrix(); }
+  function frame(t){
+    raf = requestAnimationFrame(frame);
+    if (!glove) return;
+    if (auto) yaw += 0.005;
+    glove.root.rotation.set(pitch, yaw, 0); G3.setGrain(0); G3.setEnvIntensity(0.9);
+    renderer.render(studio.scene, cam);
+  }
+  return {
+    start(){
+      if (failed) return;
+      if (!CAN_3D){ ready3D.then(ok => { if (!ok && !failed) fallback(); }); return; }
+      try { if(!built) build(); ensureGlove(); size(); if(!raf) frame(); } catch(e){ console.warn(e); fallback(); }
+    },
+    stop(){ if(raf){ cancelAnimationFrame(raf); raf=null; } },
+    refresh(){ if (failed){ const fb=container.querySelector('canvas'); if (fb) drawGlove2D(fb, S.color); } else if (built) ensureGlove(); },
+    resize(){ if(built && !failed) size(); }
+  };
+}
+const hero = turntable($('hero'));
+const viewer = turntable($('viewer3d'), { drag:true });
+addEventListener('resize', () => { hero.resize(); viewer.resize(); if (current==='s-cam') layoutCam(); });
+
+/* Miniaturas del guante para las tarjetas */
+function thumbR(modelKey, colorKey, target){
+  if (!CAN_3D){ drawGlove2D(target, colorKey); return; }
+  G3.renderThumb(modelKey, colorKey, target).catch(() => drawGlove2D(target, colorKey));
+}
+
+/* ================= Flujo: preguntas y recomendación ================= */
+function radioGroup(container, onPick){
+  container.querySelectorAll('[role=radio]').forEach(b => b.addEventListener('click', () => {
+    container.querySelectorAll('[role=radio]').forEach(x => x.setAttribute('aria-checked', String(x===b)));
+    onPick(b.dataset.val);
+  }));
+}
+radioGroup($('opts-uso'), v => { S.uso=v; $('q1-next').disabled=false; });
+radioGroup($('opts-peso'), v => { S.peso=+v; $('q2-next').disabled=false; });
+$('q1-next').onclick = () => { $('uso-label').textContent = S.uso==='sparring'?'Sparring':'Entrenamiento'; go('s-q2'); };
+$('q2-next').onclick = () => { S.knowOz=false; computeReco(); renderReco(); go('s-reco'); };
+$('know-oz').onclick = () => { S.knowOz=true; S.ozRec=16; S.uso=S.uso||null; renderReco(); go('s-reco'); };
+$('reco-back').onclick = () => go(S.knowOz ? 's-intro' : 's-q2');
+
+function computeReco(){
+  S.ozRec = CONFIG.ozGuide[S.uso][S.peso];
+  S.model = S.uso==='sparring' ? 'elite' : 'pro';
+}
+function availableOz(model){ return CONFIG.stock[model]; }
+function pickTryOz(){ const av = availableOz(S.model); S.ozTry = av.includes(S.ozRec) ? S.ozRec : av.reduce((a,b)=>Math.abs(b-S.ozRec)<Math.abs(a-S.ozRec)?b:a); }
+function renderReco(){
+  const box = $('reco-box');
+  if (S.knowOz){
+    box.innerHTML = `<div class="why"><b>Elegí tu guante</b>Todos los modelos están disponibles en 16 oz. Elegí uno para probártelo.</div>`;
+  } else {
+    const why = S.uso==='sparring' ? 'Más acolchado para cuidar tu mano y la de tu compañero.' : 'Buen equilibrio entre protección y velocidad para bolsa y manoplas.';
+    box.innerHTML = `<div class="oz">${S.ozRec}<small> oz</small></div><div class="why"><b>${S.uso==='sparring'?'Para sparring':'Para entrenamiento'} · ${PESOS[S.peso]}</b>${why}</div>`;
+  }
+  renderModels(); updateOzNotice();
+}
+function renderModels(){
+  const wrap = $('models'); wrap.innerHTML='';
+  const ideal = S.knowOz ? null : (S.uso==='sparring' ? 'elite' : 'pro');
+  Object.entries(CONFIG.models).forEach(([key,m]) => {
+    const b = document.createElement('button'); b.className='model'; b.setAttribute('role','radio'); b.setAttribute('aria-checked', String(key===S.model));
+    const av = availableOz(key);
+    b.innerHTML = `<canvas width="128" height="128" aria-hidden="true"></canvas><span class="tx"><strong>${m.name}</strong>${key===ideal?'<span class="tag">IDEAL</span>':''}<div class="meta">${m.desc}</div><div class="stock">Hay stock en ${av.join(', ')} oz</div></span><span class="price">${money(m.price)}</span>`;
+    b.onclick = () => { S.model=key; wrap.querySelectorAll('.model').forEach(x=>x.setAttribute('aria-checked', String(x===b))); updateOzNotice(); $('reco-next').textContent = 'Probarme el ' + m.name; };
+    wrap.appendChild(b);
+    thumbR(key, S.color, b.querySelector('canvas'));
+  });
+  $('reco-next').textContent = 'Probarme el ' + CONFIG.models[S.model].name;
+}
+function updateOzNotice(){
+  pickTryOz();
+  const n = $('oz-notice');
+  if (!S.knowOz && S.ozTry !== S.ozRec){
+    n.hidden=false;
+    $('oz-notice-tx').textContent = `Para tu perfil recomendamos ${S.ozRec} oz, pero hoy el ${CONFIG.models[S.model].name} está disponible en ${availableOz(S.model).join(', ')} oz. Podés probarte el de ${S.ozTry} oz para ver el tamaño o consultarnos por otros talles.`;
+  } else n.hidden=true;
+}
+$('reco-next').onclick = () => go('s-perm');
+$('perm-no').onclick = () => go('s-viewer');
+$('perm-yes').onclick = () => startCamera();
+
+/* ================= Visor 3D ================= */
+function renderColorSwatches(container, onChange){
+  container.innerHTML='';
+  Object.entries(CONFIG.colors).forEach(([key,c]) => {
+    const b = document.createElement('button'); b.className='swatch'; b.setAttribute('role','radio'); b.setAttribute('aria-checked', String(key===S.color));
+    b.style.background = c.leather; b.setAttribute('aria-label', c.label); b.title = c.label;
+    b.onclick = () => { S.color=key; container.querySelectorAll('.swatch').forEach(x=>x.setAttribute('aria-checked', String(x===b))); onChange(); };
+    container.appendChild(b);
+  });
+  const lab = document.createElement('span'); lab.className='muted'; lab.textContent = CONFIG.colors[S.color].label; lab.id = container.id+'-label'; container.appendChild(lab);
+}
+function openViewer(){
+  const m = CONFIG.models[S.model];
+  $('v-name').textContent = `${m.name} · ${S.ozTry} oz`; $('v-price').textContent = money(m.price);
+  renderColorSwatches($('v-colors'), () => { $('v-colors-label').textContent = CONFIG.colors[S.color].label; viewer.refresh(); });
+}
+const _go = go; go = function(id){ if (id==='s-viewer') { pickTryOz(); openViewer(); } _go(id); };
+$('viewer-back').onclick = () => go('s-reco');
+$('viewer-cam').onclick = () => go('s-perm');
+$('viewer-buy').onclick = () => openCart();
+
+/* ================= Cámara + detección de manos ================= */
+const video = $('video'), glCanvas = $('gl'), dots = $('dots'), dctx = dots.getContext('2d');
+let stream=null, hands=null, handsReady=null, running=false, busy=false, camRAF=null;
+let renderer3=null, scene3=null, cam3=null, stage=null, glove3=null, glove3Model=null, lightStats=null;
+let view = { w:0, h:0, scale:1, ox:0, oy:0, mirror:false };
+let phase = 'scan';            // 'scan' | 'on'
+let seenFrames=0, lastSeen=0, scanStart=0, smooth=null, openK=0.9, lightLevel=null;
+const LOST_MS = 600, NOHAND_MS = 8000;
+
+function setStatus(text, kind){ $('status-tx').textContent = text; const c=$('status-chip'); c.className = 'chip' + (kind?' '+kind:''); }
+
+function initHands(){
+  if (handsReady) return handsReady;
+  handsReady = (async () => {
+    if (typeof Hands === 'undefined') throw new Error('hands-js');
+    hands = new Hands({ locateFile: (f) => 'vendor/mediapipe-hands/' + f });
+    hands.setOptions({ maxNumHands:1, modelComplexity: isTouch ? 0 : 1, minDetectionConfidence:0.6, minTrackingConfidence:0.5, selfieMode:false });
+    hands.onResults(onResults);
+    await Promise.race([ hands.initialize(), new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 30000)) ]);
+    return hands;
+  })();
+  handsReady.catch(() => { handsReady=null; });
+  return handsReady;
+}
+
+function showLoading(text){ go('s-msg'); $('msg-loading').hidden=false; $('msg-error').hidden=true; $('msg-loading-tx').textContent=text; $('msg-back').onclick=()=>go('s-perm'); }
+function showError({title, text, steps=[], actions=[]}){
+  go('s-msg'); $('msg-loading').hidden=true; $('msg-error').hidden=false;
+  $('msg-title').textContent=title; $('msg-text').textContent=text;
+  const ul=$('msg-steps'); ul.innerHTML=''; steps.forEach(s=>{ const li=document.createElement('li'); li.textContent=s; ul.appendChild(li); }); ul.hidden=!steps.length;
+  const a=$('msg-actions'); a.innerHTML='';
+  actions.forEach(([label,fn,cls]) => { const b=document.createElement('button'); b.className='btn'+(cls?' '+cls:''); b.textContent=label; b.onclick=fn; a.appendChild(b); });
+  $('msg-back').onclick=()=>go('s-reco');
+}
+const VIEW3D = ['Ver el guante en 3D', () => go('s-viewer'), 'ghost'];
+
+async function startCamera(){
+  if (IS_FILE){
+    return showError({ title:'Abriste el archivo directamente',
+      text:'Así funcionan las preguntas, pero la cámara, el detector de manos y el guante 3D necesitan que la página se abra desde una dirección web.',
+      steps:['En la compu: en esta carpeta corré "python3 -m http.server 8000" y abrí http://localhost:8000.','En el celular: publicá la carpeta en GitHub Pages o Netlify y abrí la dirección https (ver LEEME).'],
+      actions: CAN_3D ? [VIEW3D] : [['Volver a la recomendación', () => go('s-reco'), 'ghost']] });
+  }
+  const ok3D = await ready3D;
+  if (HAS_WEBGL && (!ok3D || !HAS_HANDS)){
+    return showError({ title:'Faltan archivos del probador',
+      text:'La página se abrió sin la carpeta "vendor", que tiene el detector de manos y el motor 3D.',
+      steps:['Descomprimí el zip completo; no abras el index.html desde adentro del zip.','Dejá index.html junto a la carpeta "vendor" y abrilo desde un servidor o desde la dirección publicada (ver LEEME).'],
+      actions:[['Volver a la recomendación', () => go('s-reco'), 'ghost']] });
+  }
+  if (!HAS_WEBGL){
+    return showError({ title:'Tu navegador no puede mostrar el guante en 3D',
+      text:'Este navegador tiene desactivado WebGL, que se necesita para dibujar el guante.',
+      steps:['Probá con la última versión de Chrome o Safari.','En la compu, activá la aceleración por hardware en la configuración del navegador.'],
+      actions:[['Volver a la recomendación', () => go('s-reco'), 'ghost']] });
+  }
+  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    return showError({ title:'Tu navegador no permite usar la cámara acá',
+      text:'La cámara solo funciona en páginas seguras (https) y en navegadores actualizados.',
+      steps:['Abrí el probador desde su dirección https en Chrome o Safari.','Si lo abriste desde otra app, probá con “Abrir en el navegador”.'],
+      actions:[VIEW3D] });
+  }
+  showLoading('Preparando la cámara y el detector de manos…');
+  if (S.facing === null) S.facing = isTouch ? 'environment' : 'user';
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:S.facing, width:{ideal:1280}, height:{ideal:720} } });
+  } catch (e) {
+    const n = e && e.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError'){
+      return showError({ title:'No diste permiso para usar la cámara',
+        text:'Sin la cámara no podemos ponerte el guante en la mano, pero podés verlo en 3D.',
+        steps:['Tocá el candado o el ícono de cámara al lado de la dirección.','Elegí “Permitir” para la cámara y recargá la página.'],
+        actions:[['Reintentar', startCamera], VIEW3D] });
+    }
+    if (n === 'NotFoundError' || n === 'OverconstrainedError'){
+      return showError({ title:'No encontramos una cámara', text:'Este dispositivo no tiene una cámara disponible o la está usando otra app.',
+        steps:['Cerrá otras apps que estén usando la cámara.','Probá desde el celular.'], actions:[['Reintentar', startCamera], VIEW3D] });
+    }
+    return showError({ title:'No pudimos abrir la cámara', text:'Algo falló al iniciar la cámara.', steps:['Cerrá otras apps que usen la cámara y volvé a intentar.'], actions:[['Reintentar', startCamera], VIEW3D] });
+  }
+  try { await initHands(); }
+  catch (e) {
+    stopStream();
+    return showError({ title:'No pudimos cargar el detector de manos', text:'Puede ser la conexión o un navegador sin soporte para WebAssembly.',
+      steps:['Revisá tu conexión y volvé a intentar.','Usá la última versión de Chrome o Safari.'], actions:[['Reintentar', startCamera], VIEW3D] });
+  }
+  video.srcObject = stream;
+  video.classList.toggle('mirror', S.facing === 'user');
+  try { await video.play(); } catch(_){}
+  await new Promise(r => video.readyState >= 2 ? r() : video.addEventListener('loadeddata', r, { once:true }));
+  await setupScene();
+  go('s-cam');
+  layoutCam();
+  resetScan();
+  running = true; loop();
+}
+function stopStream(){ if (stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } }
+function stopCamera(){ running=false; if (camRAF) cancelAnimationFrame(camRAF); camRAF=null; stopStream(); video.srcObject=null; }
+
+async function setupScene(){
+  if (!renderer3){
+    renderer3 = G3.makeRenderer(glCanvas, { preserve:true });
+    stage = G3.createARStage(renderer3); scene3 = stage.scene;
+    cam3 = new THREE.OrthographicCamera(0, 1, 0, -1, -5000, 5000); cam3.position.z = 1000;
+  }
+  if (!glove3 || glove3Model !== S.model){
+    if (glove3) scene3.remove(glove3.root);
+    glove3 = await G3.createGlove(S.model, S.color); glove3Model = S.model; glove3.root.matrixAutoUpdate = false; glove3.root.visible = false; scene3.add(glove3.root);
+  }
+  glove3.setColor(S.color);
+  const m = CONFIG.models[S.model];
+  $('to-name').textContent = m.name; $('to-desc').textContent = `${m.desc.split(' · ')[0]} · ${CONFIG.colors[S.color].label} · ${S.ozTry} oz`;
+  $('to-price').textContent = money(m.price);
+  $('to-stock').textContent = `En stock · Hasta ${CONFIG.cuotas} cuotas sin interés`;
+  renderColorSwatches($('to-colors'), () => {
+    glove3.setColor(S.color); $('to-colors-label').textContent = CONFIG.colors[S.color].label;
+    $('to-desc').textContent = `${m.desc.split(' · ')[0]} · ${CONFIG.colors[S.color].label} · ${S.ozTry} oz`;
+    thumbR(S.model, S.color, $('thumb-cam'));
+  });
+  const oz = document.createElement('span'); oz.className='oz-chip'; oz.textContent = `${S.ozTry} oz`; $('to-colors').appendChild(oz);
+  thumbR(S.model, S.color, $('thumb-cam'));
+  $('reco-chip').textContent = S.knowOz ? `Probando ${S.ozTry} oz` : (S.ozTry===S.ozRec ? `✓ Recomendado para vos (${S.ozRec} oz)` : `Probando ${S.ozTry} oz · recomendado ${S.ozRec} oz`);
+}
+function layoutCam(){
+  const w = innerWidth, h = innerHeight;
+  const vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
+  const scale = Math.max(w/vw, h/vh);
+  view = { w, h, scale, ox:(w - vw*scale)/2, oy:(h - vh*scale)/2, vw, vh, mirror: S.facing==='user' };
+  // Renderizar con la misma nitidez que el video: un guante más definido que la imagen delata que es falso
+  renderer3.setPixelRatio(Math.max(0.75, Math.min(Math.min(devicePixelRatio||1, 2), 1/scale)));
+  renderer3.setSize(w, h, false);
+  cam3.left=0; cam3.right=w; cam3.top=0; cam3.bottom=-h; cam3.updateProjectionMatrix();
+  const dpr = Math.min(devicePixelRatio||1,2); dots.width = w*dpr; dots.height = h*dpr; dctx.setTransform(dpr,0,0,dpr,0,0);
+}
+function resetScan(){
+  phase='scan'; seenFrames=0; lastSeen=0; scanStart=performance.now(); smooth=null; filters=null;
+  $('scan-card').hidden=false; $('tryon').hidden=true; $('frame').hidden=false; $('reco-chip').hidden=true; $('cam-clean').hidden=true;
+  $('scan-error').hidden=true; $('scan-title').textContent='Mostrá tu mano'; $('scan-sub').hidden=false;
+  $('scan-meter').style.width='0%'; setStatus('Buscando tu mano…','warn');
+  if (glove3) glove3.root.visible=false;
+  if (stage) stage.updateShadow(null,null,0,false);
+}
+async function loop(){
+  if (!running) return;
+  camRAF = requestAnimationFrame(loop);
+  if (busy || video.readyState < 2) return;
+  busy = true;
+  const t = performance.now();
+  G3.tick(t); stage.updateEnv(video, view.mirror, t);
+  try { await hands.send({ image: video }); } catch(e){ /* frame perdido */ }
+  busy = false;
+  measureLight();
+}
+/* Luz: brillo promedio de una muestra chica del video cada 500 ms */
+const lc = document.createElement('canvas'); lc.width=32; lc.height=24; const lctx = lc.getContext('2d', { willReadFrequently:true }); let lastLight=0;
+function measureLight(){
+  const t=performance.now(); if (t-lastLight<500) return; lastLight=t;
+  try {
+    lctx.drawImage(video,0,0,32,24); const d=lctx.getImageData(0,0,32,24).data;
+    let s=0, r=0, g=0, b=0, L=0, Rr=0, T=0, B=0;
+    for (let y=0;y<24;y++) for (let x=0;x<32;x++){ const i=(y*32+x)*4, l=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; s+=l; r+=d[i]; g+=d[i+1]; b+=d[i+2]; if (x<16) L+=l; else Rr+=l; if (y<12) T+=l; else B+=l; }
+    const n=32*24; lightLevel = s/n;
+    let dx = (Rr-L)/(s||1), dy = (T-B)/(s||1); if (view.mirror) dx = -dx;
+    lightStats = { lum:lightLevel, r:r/n, g:g/n, b:b/n, dx, dy };
+    if (stage) stage.updateLights(lightStats);
+  } catch(_){}
+  const el=$('st-light'); if (lightLevel==null) return;
+  if (lightLevel < 55){ el.textContent='Baja'; el.className='warn'; } else { el.textContent='Buena'; el.className='ok'; }
+}
+function toScreen(lm){
+  let x = lm.x*view.vw*view.scale + view.ox;
+  const y = lm.y*view.vh*view.scale + view.oy;
+  if (view.mirror) x = view.w - x;
+  return [x, y, -lm.z*view.vw*view.scale];
+}
+const V = (a) => new THREE.Vector3(a[0], -a[1], a[2]);
+/* Filtro One Euro: suaviza el temblor cuando la mano está quieta sin agregar retraso cuando se mueve */
+let filters = null;
+function oneEuro(minCutoff, beta, dCutoff=1.0){
+  let xPrev=null, dxPrev=0, tPrev=null;
+  const alpha = (cutoff, dt) => { const tau = 1/(2*Math.PI*cutoff); return 1/(1+tau/dt); };
+  return (x, tMs) => {
+    if (xPrev===null){ xPrev=x; tPrev=tMs; return x; }
+    const dt = Math.max(1e-3, (tMs - tPrev)/1000); tPrev = tMs;
+    const dx = (x - xPrev)/dt, edx = dxPrev + alpha(dCutoff, dt)*(dx - dxPrev); dxPrev = edx;
+    const cutoff = minCutoff + beta*Math.abs(edx);
+    xPrev = xPrev + alpha(cutoff, dt)*(x - xPrev); return xPrev;
+  };
+}
+
+function onResults(res){
+  if (!running) return;
+  const now = performance.now();
+  dctx.clearRect(0,0,view.w,view.h);
+  const lms = res.multiHandLandmarks && res.multiHandLandmarks[0];
+  if (!lms){
+    $('st-pts').textContent='0/21'; $('st-pts').className='';
+    $('st-dist').textContent='—'; $('st-dist').className='';
+    if (phase==='scan'){
+      seenFrames = Math.max(0, seenFrames-2); $('scan-meter').style.width = Math.min(100, seenFrames/18*100)+'%';
+      if (now - scanStart > NOHAND_MS && $('scan-error').hidden) showNoHand();
+    } else if (now - lastSeen > LOST_MS){
+      glove3.root.visible = false; stage.updateShadow(null,null,0,false); setStatus('Buscando tu mano…','warn'); filters = null;
+    }
+    renderer3.render(scene3, cam3);
+    return;
+  }
+  lastSeen = now;
+  const label = res.multiHandedness && res.multiHandedness[0] ? res.multiHandedness[0].label : 'Right';
+  // Con imágenes sin espejar, MediaPipe invierte la etiqueta. Si mostramos espejado, la mano en pantalla cambia de lado.
+  const actualRight = label === 'Left';
+  const rightOnScreen = actualRight !== view.mirror;
+
+  // Suavizado de puntos para evitar temblores
+  const pts = lms.map(toScreen);
+  if (!filters) filters = pts.map(() => [0,1,2].map(() => oneEuro(1.4, 0.012)));
+  smooth = pts.map((p,i) => p.map((v,k) => filters[i][k](v, now)));
+
+  // Distancia: tamaño de la mano respecto de la pantalla
+  let minY=1e9,maxY=-1e9,minX=1e9,maxX=-1e9; for (const p of smooth){ minX=Math.min(minX,p[0]); maxX=Math.max(maxX,p[0]); minY=Math.min(minY,p[1]); maxY=Math.max(maxY,p[1]); }
+  const frac = Math.max(maxY-minY, maxX-minX) / Math.min(view.w, view.h);
+  const tooClose = (maxY-minY) > view.h*0.88 || (maxX-minX) > view.w*0.92 || minY < -10 || maxY > view.h+10;
+  const dist = $('st-dist');
+  if (frac < 0.22){ dist.textContent='Acercala'; dist.className='warn'; }
+  else if (tooClose){ dist.textContent='Alejala'; dist.className='warn'; }
+  else { dist.textContent='Bien'; dist.className='ok'; }
+  $('st-pts').textContent='21/21'; $('st-pts').className='ok';
+
+  if (phase==='scan'){
+    drawSkeleton(smooth);
+    if (dist.className==='ok') seenFrames++;
+    $('scan-meter').style.width = Math.min(100, seenFrames/18*100)+'%';
+    $('scan-title').textContent = dist.className==='ok' ? 'Midiendo tu mano…' : (frac<0.22?'Acercá un poco la mano':'Alejá un poco la mano');
+    setStatus('Midiendo tu mano…','warn');
+    if (seenFrames >= 18) placeGlove();
+  }
+  if (phase==='on') { setStatus('Guante colocado','ok'); updateGlove(smooth, rightOnScreen); }
+  renderer3.render(scene3, cam3);
+}
+function drawSkeleton(p){
+  const C = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  dctx.lineWidth=2; dctx.strokeStyle='rgba(242,184,101,.8)';
+  dctx.beginPath(); for (const [a,b] of C){ dctx.moveTo(p[a][0],p[a][1]); dctx.lineTo(p[b][0],p[b][1]); } dctx.stroke();
+  for (const q of p){ dctx.beginPath(); dctx.arc(q[0],q[1],5,0,Math.PI*2); dctx.fillStyle='#F2B865'; dctx.fill(); dctx.lineWidth=2; dctx.strokeStyle='#1C1405'; dctx.stroke(); }
+}
+function showNoHand(){
+  $('scan-error').hidden=false; $('scan-title').textContent='No detectamos tu mano'; $('scan-sub').hidden=true;
+  const tips = ['Mostrá la palma abierta, con la mano entera dentro del marco.','Alejá el celular hasta ver la muñeca.'];
+  if (lightLevel!=null && lightLevel<55) tips.unshift('Hay poca luz: acercate a una ventana o una lámpara.');
+  if (isTouch) tips.push('Si usás la cámara frontal, cambiá a la trasera con el botón de la derecha.');
+  const ul=$('scan-tips'); ul.innerHTML=''; tips.forEach(t=>{const li=document.createElement('li'); li.textContent=t; ul.appendChild(li);});
+  setStatus('Sin mano detectada','err');
+}
+$('scan-retry').onclick = () => resetScan();
+function placeGlove(){
+  phase='on';
+  $('scan-card').hidden=true; $('tryon').hidden=false; $('frame').hidden=true; $('reco-chip').hidden=false; $('cam-clean').hidden=false;
+  glove3.root.visible = true;
+  if (navigator.vibrate) try{ navigator.vibrate(30); }catch(_){}
+}
+function updateGlove(p, rightOnScreen){
+  const wrist=V(p[0]), idx=V(p[5]), mid=V(p[9]), pky=V(p[17]), tip=V(p[12]);
+  const upv = new THREE.Vector3().subVectors(mid, wrist);
+  const palm = upv.length(); if (palm < 8) return;
+  const up = upv.clone().normalize();
+  const across = new THREE.Vector3().subVectors(idx, pky); across.addScaledVector(up, -across.dot(up)).normalize();
+  const n = new THREE.Vector3().crossVectors(across, up).normalize();
+  const back = rightOnScreen ? n.clone().negate() : n.clone();
+  const xl = new THREE.Vector3().crossVectors(up, back).normalize();
+  const thumbSign = Math.sign(across.dot(xl)) || 1;
+  glove3.setThumbSide(thumbSign);
+  // Se amolda: el cuerpo del guante se acorta al cerrar el puño
+  const o = tip.distanceTo(wrist) / palm;                       // ~1.0 puño … ~1.9 mano abierta
+  const target = THREE.MathUtils.clamp(0.74 + (o-1.0)/(1.9-1.0)*(1.12-0.74), 0.74, 1.14);
+  openK += (target - openK)*0.25; if (!glove3.isGLB) glove3.setOpenness(openK);
+  const s = palm * (CONFIG.ozScale[S.ozTry] || 1);
+  const center = wrist.clone().addScaledVector(up, s*0.75);
+  stage.updateShadow(center, up, s, true);
+  const m = new THREE.Matrix4().makeBasis(xl.multiplyScalar(s), up.multiplyScalar(s), back.multiplyScalar(s));
+  m.setPosition(wrist.x, wrist.y, wrist.z);
+  glove3.root.matrix.copy(m); glove3.root.matrixWorldNeedsUpdate = true;
+  glove3.root.visible = true;
+}
+
+/* Controles de la vista de cámara */
+$('cam-back').onclick = () => go('s-reco');
+$('cam-help').onclick = () => { $('help').hidden=false; $('help-close').focus(); };
+$('help-close').onclick = () => $('help').hidden=true;
+$('help').addEventListener('click', e => { if (e.target.id==='help') $('help').hidden=true; });
+$('cam-flip').onclick = async () => { S.facing = S.facing==='user' ? 'environment' : 'user'; stopCamera(); await startCamera(); };
+$('cam-clean').onclick = () => { $('cam-ui').classList.add('clean'); $('clean-exit').hidden=false; };
+$('clean-exit').onclick = () => { $('cam-ui').classList.remove('clean'); $('clean-exit').hidden=true; };
+$('timer-btn').onclick = () => { S.timer=!S.timer; $('timer-btn').setAttribute('aria-pressed', String(S.timer)); toast(S.timer?'Temporizador activado: la foto se saca 3 segundos después de tocar.':'Temporizador desactivado.'); };
+$('shutter').onclick = () => S.timer ? countdown(3) : takePhoto();
+$('to-buy').onclick = () => openCart();
+function countdown(n){
+  const el=$('countdown'); el.hidden=false; el.textContent=n;
+  const iv=setInterval(()=>{ n--; if(n<=0){ clearInterval(iv); el.hidden=true; takePhoto(); } else el.textContent=n; },1000);
+}
+
+/* ================= Foto ================= */
+let photoURL=null, photoBlob=null;
+function takePhoto(){
+  const dpr = Math.min(devicePixelRatio||1,2);
+  const w = Math.round(view.w*dpr), h = Math.round(view.h*dpr);
+  const c = document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d');
+  g.save();
+  if (view.mirror){ g.translate(w,0); g.scale(-1,1); }
+  g.drawImage(video, view.ox*dpr, view.oy*dpr, view.vw*view.scale*dpr, view.vh*view.scale*dpr);
+  g.restore();
+  renderer3.render(scene3, cam3);
+  g.drawImage(glCanvas, 0, 0, w, h);
+  // Marca Tempo
+  const band = Math.round(h*0.16);
+  const grd = g.createLinearGradient(0,h-band,0,h); grd.addColorStop(0,'rgba(0,0,0,0)'); grd.addColorStop(1,'rgba(0,0,0,.72)');
+  g.fillStyle=grd; g.fillRect(0,h-band,w,band);
+  const pad = Math.round(w*0.05), fs = Math.round(Math.min(w,h)*0.045);
+  g.fillStyle='#F2B865'; g.font=`900 ${fs}px "Archivo Black","Arial Black",sans-serif`; g.textBaseline='alphabetic';
+  g.fillText('TEMPO', pad, h - pad - fs*1.25);
+  g.fillStyle='#F4EFE6'; g.font=`600 ${Math.round(fs*0.62)}px Archivo, Arial, sans-serif`;
+  g.fillText(`${CONFIG.models[S.model].name} · ${CONFIG.colors[S.color].label} · ${S.ozTry} oz`, pad, h - pad);
+  const fl=$('flash'); fl.style.opacity='0.8'; setTimeout(()=>fl.style.opacity='0',120);
+  c.toBlob(b => {
+    photoBlob=b; if (photoURL) URL.revokeObjectURL(photoURL); photoURL=URL.createObjectURL(b);
+    $('photo-img').src=photoURL; $('photo-save').href=photoURL;
+    stopCamera(); _go('s-photo'); current='s-photo';
+    const canShare = navigator.canShare && navigator.canShare({ files:[new File([b],'tempo.jpg',{type:'image/jpeg'})] });
+    $('photo-share').hidden = !canShare;
+  }, 'image/jpeg', 0.92);
+}
+$('photo-share').onclick = async () => { try { await navigator.share({ files:[new File([photoBlob],'tempo-probador.jpg',{type:'image/jpeg'})], text:'Me probé el guante Tempo #DominaTuRitmo' }); } catch(_){} };
+$('photo-redo').onclick = () => startCamera();
+$('photo-back').onclick = () => startCamera();
+$('photo-cart').onclick = () => openCart();
+
+/* ================= Carrito ================= */
+let backFromCart = 's-reco';
+function openCart(){
+  backFromCart = current === 's-viewer' ? 's-viewer' : 's-reco';
+  const m = CONFIG.models[S.model];
+  $('c-name').textContent = m.name; $('c-price').textContent = money(m.price);
+  $('c-meta').textContent = `${CONFIG.colors[S.color].label} · ${S.ozTry} oz · x1`;
+  $('c-cuotas').textContent = `Hasta ${CONFIG.cuotas} cuotas sin interés de ${money(m.price/CONFIG.cuotas, true)}`;
+  $('c-transfer').textContent = `${Math.round(CONFIG.transferOff*100)} % off con transferencia: ${money(m.price*(1-CONFIG.transferOff), true)}`;
+  $('c-wraps').textContent = money(CONFIG.wraps);
+  $('add-wraps').disabled=false; $('add-wraps').textContent='+ Agregar';
+  go('s-cart');
+}
+$('add-wraps').onclick = () => { $('add-wraps').textContent='Agregadas ✓'; $('add-wraps').disabled=true; };
+$('cart-close').onclick = () => go(backFromCart);
+$('cart-more').onclick = () => go('s-reco');
+$('cart-checkout').onclick = () => toast('Este prototipo no procesa pagos: en la tienda, este botón lleva al checkout.');
+
+/* Pausar la cámara si la pestaña queda en segundo plano */
+document.addEventListener('visibilitychange', () => { if (document.hidden && current==='s-cam') { stopCamera(); _go('s-perm'); current='s-perm'; } });
+
+go('s-intro');
+// Precarga del detector mientras el usuario responde las preguntas
+setTimeout(() => { initHands().catch(()=>{}); }, 1200);
+</script>
+</body>
+</html>
