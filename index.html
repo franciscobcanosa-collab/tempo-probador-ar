@@ -3,206 +3,212 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#111113">
+<meta name="theme-color" content="#111111">
 <title>Tempo · Probador AR</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
 <style>
-/* Layout: una pantalla por paso, mobile-first; la vista de cámara ocupa todo y la interfaz flota encima. */
+/* Sistema visual del UI Kit "Tempo · Probador AR" (fondo oscuro, acento ámbar, emblema dorado y rojo,
+   títulos Archivo expandida 800 en mayúsculas, texto Lato, botones píldora). Mobile-first, 390 × 844 de referencia. */
 :root{
-  --bg:#111113; --surface:#1C1C1C; --surface-2:#262523; --line:#3A3631;
-  --fg:#F4EFE6; --muted:#A89F92; --accent:#F2B865; --accent-ink:#1C1405;
-  --ok:#3FBF6F; --warn:#F2B865; --err:#E8796A;
-  --display:'Archivo Black','Arial Black',Impact,sans-serif;
-  --body:'Archivo',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
-  --r:18px; color-scheme:dark;
+  --bg:#141414; --bar:#111111; --surface:#1C1C1C; --control:#242424; --line:#3D3D3D; --rest:#7A7A7A; --img:#17120F;
+  --fg:#FFFFFF; --fg2:#B8B8B8; --support:#E6E6E6; --support2:#C8C8C8;
+  --accent:#F2B866; --on-accent:#111111; --sel:#3A2A16; --accent-soft:rgba(242,184,102,.75);
+  --ok:#7BE38A; --err:#FF8A80; --glow:rgba(130,22,14,.35);
+  --display:'Archivo','Arial Black',system-ui,sans-serif; --body:'Lato',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  color-scheme:dark;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 [tabindex="-1"]:focus{outline:none}
-html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;-webkit-font-smoothing:antialiased}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:400 15px/22px var(--body);-webkit-font-smoothing:antialiased}
 body{overflow:hidden}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .screen{position:fixed;inset:0;display:flex;flex-direction:column;overflow-y:auto;
-  padding:calc(env(safe-area-inset-top,0px) + 18px) max(18px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 18px) max(18px,env(safe-area-inset-left,0px));
-  background:var(--bg)}
+  padding:calc(env(safe-area-inset-top,0px) + 12px) max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 16px) max(16px,env(safe-area-inset-left,0px));
+  background:radial-gradient(circle at 0% 40%,var(--glow),rgba(130,22,14,0) 45%),var(--bg)}
 .screen[hidden]{display:none!important}
-.wrap{width:100%;max-width:460px;margin:0 auto;display:flex;flex-direction:column;gap:18px;flex:1}
-.top{display:flex;align-items:center;gap:12px;min-height:44px}
-.top .ttl{flex:1;text-align:center;font-weight:600;font-size:15px;color:var(--muted)}
-.icon-btn{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:rgba(17,17,19,.72);display:grid;place-items:center;flex:none;backdrop-filter:blur(8px)}
+.wrap{width:100%;max-width:440px;margin:0 auto;display:flex;flex-direction:column;gap:16px;flex:1}
+/* barras */
+.bar{display:flex;align-items:center;gap:12px;min-height:56px;margin:-12px -16px 0;padding:6px 16px;background:var(--bar)}
+.bar.center{justify-content:center}
+.bar .kick{font:700 12px/16px var(--body);letter-spacing:2px;text-transform:uppercase;color:var(--accent)}
+.bar .grow{flex:1;display:flex;justify-content:center}
+.brandmark{display:flex;align-items:center;gap:10px;font:800 15px/1 var(--display);font-stretch:125%;letter-spacing:.18em;color:var(--fg)}
+.brandmark svg{width:30px;height:30px}
+.icon-btn{width:44px;height:44px;border-radius:50%;border:0;background:var(--control);display:grid;place-items:center;flex:none;color:#fff;position:relative}
 .icon-btn svg{width:20px;height:20px}
+.icon-btn .count{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;border-radius:9px;background:var(--accent);color:var(--on-accent);font:900 11px/18px var(--body);text-align:center;padding:0 4px}
 .spacer{width:44px;flex:none}
-.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700}
-h1,h2{font-family:var(--display);font-weight:400;text-transform:uppercase;line-height:1.02;margin:0;text-wrap:balance}
-h1{font-size:clamp(36px,10vw,48px)} h2{font-size:clamp(26px,7.4vw,34px)}
-p{margin:0;line-height:1.5}
-.lead{color:#D9D1C4}
-.muted{color:var(--muted);font-size:14px}
-.brand{font-family:var(--display);letter-spacing:.2em;color:var(--accent);font-size:15px}
-.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:54px;border-radius:999px;border:0;
-  background:var(--accent);color:var(--accent-ink);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:15px;padding:0 22px}
-.btn:disabled{opacity:.35;cursor:not-allowed}
-.btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
-.btn.quiet{background:transparent;color:var(--fg);border:1px solid var(--line);text-transform:none;letter-spacing:0;font-weight:600}
-.link{background:none;border:0;color:var(--fg);text-decoration:underline;text-underline-offset:3px;font-weight:600;padding:10px;align-self:center}
-.credit{font-size:12px;line-height:1.4;color:var(--muted);text-align:center;margin:0}.credit a{color:inherit}
-.footer{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:12px}
-/* intro */
-.hero-glove{height:min(38vh,320px);border-radius:var(--r);background:radial-gradient(ellipse at 50% 35%,#3A2414 0%,#1A1513 55%,#111113 100%);position:relative;overflow:hidden}
-.hero-glove canvas{position:absolute;inset:0;width:100%;height:100%}
-.steps{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
-.steps li{display:flex;gap:12px;align-items:center}
-.steps b{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-size:13px;flex:none}
-.privacy{display:flex;gap:8px;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
-.privacy svg{width:14px;height:14px}
-/* progress */
+/* tipografía */
+.eyebrow{font:700 12px/16px var(--body);letter-spacing:2px;text-transform:uppercase;color:var(--accent)}
+h1,h2,h3{font-family:var(--display);font-stretch:125%;font-weight:800;text-transform:uppercase;margin:0;text-wrap:balance}
+h1{font-size:25px;line-height:28px} h2{font-size:22px;line-height:26px}
+.t3{font:700 22px/26px var(--display);font-stretch:125%}
+.display{font:800 50px/50px var(--display);font-stretch:125%;white-space:nowrap}
+.display small{font:800 18px/1 var(--display);font-stretch:125%;color:var(--accent);margin-left:4px}
+p{margin:0}
+.body2{font-size:14px;line-height:20px;color:var(--support2)}
+.muted{font-size:13px;line-height:18px;color:var(--fg2)}
+.caption{font:700 12px/16px var(--body)}
+.price{font:900 26px/30px var(--body);font-variant-numeric:tabular-nums}
+.ok-tx{color:var(--ok);font:700 12px/16px var(--body)}
+/* botones */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;border-radius:999px;border:1.5px solid var(--accent);
+  background:var(--accent);color:var(--on-accent);font:700 14px/1 var(--body);letter-spacing:1px;text-transform:uppercase;padding:0 22px;text-align:center}
+.btn.sec{background:transparent;color:var(--accent)}
+.btn.m{min-height:44px;font-size:13px} .btn.s{min-height:36px;width:auto;font-size:12px;padding:0 14px}
+.btn:disabled{background:#3A3A3A;border-color:#3A3A3A;color:#8E8E8E;cursor:not-allowed}
+.btn.sec:disabled{background:transparent;border-color:var(--line);color:#8E8E8E}
+.btn svg{width:18px;height:18px}
+.link{background:none;border:0;color:var(--fg);font:700 13px/1 var(--body);letter-spacing:1px;text-transform:uppercase;padding:14px 10px;align-self:center;min-height:44px}
+.link.u{text-decoration:underline;text-underline-offset:4px} .link.amber{color:var(--accent)}
+.footer{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:8px}
+/* chips, etiquetas, progreso */
+.chip{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 16px;border-radius:999px;background:var(--surface);border:1.5px solid var(--rest);font:700 13px/1 var(--body);color:var(--fg)}
+.chip[aria-checked="true"]{background:var(--sel);border-color:var(--accent);color:var(--accent)}
+.chip[aria-checked="true"]::before{content:"✓"}
+.chips-col{display:flex;flex-direction:column;gap:10px}
+.chips-col .chip{min-height:48px;justify-content:flex-start;padding:0 18px;font-size:14px}
+.tag{display:inline-flex;align-items:center;gap:4px;border:1.5px solid var(--accent);color:var(--accent);border-radius:999px;padding:2px 8px;font:900 10px/14px var(--body);letter-spacing:1px;text-transform:uppercase;background:transparent}
+.tag.size{border-radius:6px;font-size:11px;letter-spacing:0;text-transform:none;background:rgba(17,17,17,.85);padding:4px 8px}
+.progress-l{font:700 11px/14px var(--body);letter-spacing:2px;text-transform:uppercase;color:var(--fg2)}
 .progress{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .progress i{height:4px;border-radius:4px;background:var(--line)}
 .progress i.on{background:var(--accent)}
-/* options */
-.opts{display:flex;flex-direction:column;gap:10px}
-.opt{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:16px;border-radius:var(--r);border:1.5px solid var(--line);background:var(--surface)}
-.opt .ic{width:44px;height:44px;border-radius:12px;background:var(--surface-2);display:grid;place-items:center;font-family:var(--display);color:var(--accent);flex:none;font-size:14px}
-.opt .tx{flex:1;min-width:0}
-.opt .tx strong{display:block;font-size:17px}
-.opt .tx span{color:var(--muted);font-size:14px}
-.opt .rd{width:22px;height:22px;border-radius:50%;border:2px solid var(--muted);flex:none;display:grid;place-items:center}
-.opt[aria-checked="true"]{border-color:var(--accent);background:linear-gradient(180deg,#2B2014,#1F1A14)}
-.opt[aria-checked="true"] .rd{border-color:var(--accent)}
-.opt[aria-checked="true"] .rd::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent)}
-.chosen{font-size:14px;color:var(--muted)} .chosen b{color:var(--accent);font-weight:600}
-/* recommendation */
-.reco{display:flex;gap:16px;align-items:center;padding:18px;border-radius:var(--r);border:1.5px solid var(--accent);background:linear-gradient(180deg,#2B2014,#1C1814)}
-.reco .oz{font-family:var(--display);font-size:56px;line-height:1;color:var(--fg);white-space:nowrap} .reco .oz small{font-size:20px;color:var(--accent)}
-.reco .why{font-size:14px;color:#D9D1C4} .reco .why b{display:block;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;font-size:12px;margin-bottom:4px}
-.notice{display:flex;gap:10px;padding:12px 14px;border-radius:14px;background:#2A2215;border:1px solid #5A4520;font-size:14px;color:#EBDDC4}
-.notice svg{flex:none;width:18px;height:18px;margin-top:2px;color:var(--accent)}
-.model{display:flex;gap:12px;align-items:center;padding:12px;border-radius:var(--r);border:1.5px solid var(--line);background:var(--surface);width:100%;text-align:left}
-.model[aria-checked="true"]{border-color:var(--accent)}
-.model canvas{width:64px;height:64px;border-radius:12px;background:#0C0C0D;flex:none}
-.model .tx{flex:1;min-width:0}
-.model strong{font-size:16px} .model .tag{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--accent-ink);background:var(--accent);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:2px}
-.model .meta{font-size:13px;color:var(--muted)} .model .stock{font-size:13px;color:var(--ok)}
-.model .price{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
-/* camera permission sheet */
-.sheet{margin-top:auto;background:var(--surface);border:1px solid var(--line);border-radius:28px;padding:22px;display:flex;flex-direction:column;gap:14px;text-align:center}
-.sheet .badge{width:56px;height:56px;border-radius:50%;border:1.5px solid var(--accent);display:grid;place-items:center;margin:0 auto;color:var(--accent)}
-.sheet .badge svg{width:26px;height:26px}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:var(--surface-2);font-size:13px;color:#D9D1C4;align-self:center}
-.pill svg{width:13px;height:13px}
-/* camera view */
+/* cards */
+.card{background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.opt{width:100%;text-align:left;cursor:pointer}
+.opt strong{font:700 16px/20px var(--body)} .opt span{font-size:14px;line-height:20px;color:var(--fg2)}
+.opt[aria-checked="true"],.model[aria-checked="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--sel)}
+.model{width:100%;text-align:left;gap:2px}
+.model .r1,.model .r3{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.model strong{font:700 17px/22px var(--body)} .model .meta{font-size:14px;color:var(--fg2)}
+.model .r3 b{font:900 18px/24px var(--body);font-variant-numeric:tabular-nums}
+.result{flex-direction:row;align-items:center;gap:16px;border-color:var(--accent-soft);background:linear-gradient(135deg,#3A2A16 0%,#1C1714 100%)}
+.result .why{font-size:14px;line-height:20px;color:var(--support)} .result .why .eyebrow{display:block;margin-bottom:2px}
+.notice{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;border:1.5px solid var(--accent-soft);background:#1F1A14;font-size:14px;line-height:20px;color:var(--support)}
+.notice svg{flex:none;width:18px;height:18px;margin-top:1px;color:var(--accent)}
+.privacy-card{flex-direction:row;align-items:center;gap:12px;font-size:14px;color:var(--support)}
+.privacy-card svg{width:18px;height:18px;flex:none}
+.privacy{display:flex;gap:8px;align-items:center;justify-content:center;color:var(--fg2);font-size:13px}
+.privacy svg{width:14px;height:14px}
+.credit{font-size:11px;line-height:15px;color:#8E8E8E;text-align:center;margin:0}.credit a{color:inherit}
+.steps{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px}
+.steps li{display:flex;gap:12px;align-items:center;font-size:15px}
+.steps b{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);display:grid;place-items:center;font:900 13px/1 var(--body);flex:none}
+.hero-glove{height:min(34vh,300px);border-radius:12px;background:radial-gradient(ellipse at 50% 38%,#3A2414 0%,var(--img) 60%,#120E0C 100%);position:relative;overflow:hidden;border:1px solid #2a2a2a}
+.hero-glove canvas{position:absolute;inset:0;width:100%;height:100%}
+.cam-badge{width:88px;height:88px;border-radius:50%;background:var(--img);border:1.5px solid var(--line);display:grid;place-items:center;margin:8px auto 0;color:var(--accent)}
+.cam-badge svg{width:36px;height:36px}
+/* cámara: todo en píldoras y paneles oscuros semitransparentes */
 #s-cam{padding:0;background:#000;overflow:hidden}
 #stage{position:absolute;inset:0;overflow:hidden;background:#000}
 #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #video.mirror{transform:scaleX(-1)}
 #gl,#dots{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .cam-ui{position:absolute;inset:0;display:flex;flex-direction:column;pointer-events:none;
-  padding:calc(env(safe-area-inset-top,0px) + 12px) max(12px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 12px) max(12px,env(safe-area-inset-left,0px))}
+  padding:calc(env(safe-area-inset-top,0px) + 12px) max(12px,env(safe-area-inset-right,0px)) 0 max(12px,env(safe-area-inset-left,0px))}
 .cam-ui > *{pointer-events:auto}
 .cam-top{display:flex;align-items:center;gap:8px}
 .cam-top .grow{flex:1;display:flex;justify-content:center}
-.chip{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border-radius:999px;background:rgba(17,17,19,.78);border:1px solid var(--line);font-size:13px;font-weight:600;backdrop-filter:blur(8px)}
-.chip .led{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-.chip.ok .led{background:var(--ok)} .chip.warn .led{background:var(--warn)} .chip.err .led{background:var(--err)}
-.chip.ok{border-color:#2F6B45} .chip.warn{border-color:#5A4520}
-.side-tools{position:absolute;right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 70px);display:flex;flex-direction:column;gap:10px}
-.reco-chip{align-self:flex-start;margin-top:10px;background:rgba(47,107,69,.9);border-color:#3D8A59;color:#E9F7EE}
-.frame{position:absolute;left:12%;right:12%;top:18%;bottom:30%;pointer-events:none}
-.frame i{position:absolute;width:34px;height:34px;border-color:var(--accent);border-style:solid;border-width:0}
-.frame i:nth-child(1){left:0;top:0;border-top-width:3px;border-left-width:3px;border-top-left-radius:10px}
-.frame i:nth-child(2){right:0;top:0;border-top-width:3px;border-right-width:3px;border-top-right-radius:10px}
-.frame i:nth-child(3){left:0;bottom:0;border-bottom-width:3px;border-left-width:3px;border-bottom-left-radius:10px}
-.frame i:nth-child(4){right:0;bottom:0;border-bottom-width:3px;border-right-width:3px;border-bottom-right-radius:10px}
-.scan-card{margin-top:auto;background:rgba(28,28,28,.94);border:1px solid var(--line);border-radius:24px;padding:18px;display:flex;flex-direction:column;gap:12px;backdrop-filter:blur(10px)}
-.scan-card h3{margin:0;font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:20px}
-.meter{height:5px;border-radius:5px;background:var(--line);overflow:hidden}
-.meter i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.stat{background:var(--surface-2);border-radius:12px;padding:8px 10px}
-.stat span{display:block;font-size:11px;color:var(--muted)} .stat b{font-size:14px;font-variant-numeric:tabular-nums}
-.stat b.ok{color:var(--ok)} .stat b.warn{color:var(--warn)}
-.tips{margin:0;padding-left:18px;color:#D9D1C4;font-size:14px;line-height:1.5}
-.tryon{margin-top:auto;background:rgba(28,28,28,.95);border:1px solid var(--line);border-radius:26px;padding:14px;display:flex;flex-direction:column;gap:12px;backdrop-filter:blur(10px)}
-.tryon .prod{display:flex;align-items:center;gap:12px}
-.tryon .prod canvas{width:48px;height:48px;border-radius:10px;background:#0C0C0D;flex:none}
-.tryon .prod .tx{flex:1;min-width:0} .tryon .prod strong{display:block} .tryon .prod span{font-size:13px;color:var(--muted)}
-.row{display:flex;align-items:center;gap:10px}
-.swatch{width:34px;height:34px;border-radius:9px;border:2px solid var(--line);padding:0}
-.swatch[aria-checked="true"]{border-color:var(--accent);box-shadow:0 0 0 2px #111113 inset}
-.oz-chip{margin-left:auto;padding:6px 12px;border-radius:999px;border:1.5px solid var(--accent);color:var(--accent);font-weight:700;font-size:13px}
-.buy-row{display:flex;align-items:center;gap:12px}
-.buy-row .price{flex:1;min-width:0} .buy-row .price b{display:block;font-size:18px;font-variant-numeric:tabular-nums} .buy-row .price span{font-size:12px;color:var(--ok)}
-.shutter{width:64px;height:64px;border-radius:50%;border:4px solid var(--fg);background:rgba(255,255,255,.18);flex:none;position:relative}
-.shutter::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--fg)}
-.timer-btn{min-width:44px;height:44px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);font-size:13px;font-weight:700;padding:0 10px}
-.timer-btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
-.buy{min-height:48px;width:auto;padding:0 20px;font-size:14px}
-.countdown{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);font-size:120px;color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.6);pointer-events:none}
+.cam-ui .icon-btn{background:rgba(0,0,0,.6)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;font:700 12px/16px var(--body);backdrop-filter:blur(6px)}
+.pill.ok{color:var(--ok)}
+.pill.err{color:var(--err)}
+.size-tag{position:absolute;right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 66px)}
+.guide{position:absolute;left:50%;top:44%;width:min(62vw,280px);aspect-ratio:3/4;transform:translate(-50%,-50%);pointer-events:none;
+  border:2.5px dashed #fff;border-radius:48% 48% 34% 34% / 36% 36% 26% 26%;overflow:hidden}
+.guide .scanline{position:absolute;left:8%;right:8%;height:2px;background:var(--accent);top:50%;box-shadow:0 0 12px rgba(242,184,102,.8);animation:scan 2.2s ease-in-out infinite alternate}
+@keyframes scan{from{top:18%}to{top:82%}}
+.scan-text{margin-top:auto;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center;padding:16px 8px calc(env(safe-area-inset-bottom,0px) + 18px);
+  background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.55) 30%,rgba(0,0,0,.72));margin-left:-12px;margin-right:-12px}
+.scan-text h2{font-size:20px;line-height:24px}
+.scan-text p{font-size:14px;line-height:20px;color:var(--support);max-width:340px}
+.cam-chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+.cam-chips .pill{border:1px solid #444}
+.cam-chips .pill b{font-weight:700} .cam-chips .pill b.ok{color:var(--ok)} .cam-chips .pill b.warn{color:var(--accent)}
+.scan-error{background:rgba(17,17,17,.94);border:1.5px solid var(--line);border-radius:16px;padding:14px 16px;text-align:left;width:100%;max-width:420px;display:flex;flex-direction:column;gap:10px}
+.tips{margin:0;padding-left:18px;color:var(--support);font-size:14px;line-height:20px}
+.pin{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;background:var(--accent);color:var(--on-accent);border:2px solid #fff;font:900 12px/22px var(--body);text-align:center;padding:0;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.pin::after{content:"";position:absolute;inset:-9px;border-radius:50%}
+.zone{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--sheet-h,220px) + 12px);width:min(92vw,400px);background:rgba(17,17,17,.94)}
+.zone{flex-direction:row;align-items:flex-start}
+.zone strong{font:700 15px/20px var(--body)}
+.sheet{margin:auto -12px 0;background:var(--bar);border-top:1.5px solid var(--line);border-radius:28px 28px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 16px);display:flex;flex-direction:column;gap:10px}
+.sheet .name{font:700 15px/20px var(--body)}
+.sheet .row{display:flex;align-items:center;gap:10px}
+.sheet .row .price{font-size:20px;line-height:24px;margin-left:auto}
+.sheet .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.swatches{display:flex;gap:4px;align-items:center}
+.swatch{width:44px;height:44px;border:0;background:transparent;padding:0;display:grid;place-items:center}
+.swatch i{width:24px;height:24px;border-radius:3px;box-shadow:0 0 0 2px var(--line)}
+.swatch[aria-checked="true"] i{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--accent)}
+.countdown{position:absolute;inset:0;display:grid;place-items:center;font:800 120px/1 var(--display);color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.6);pointer-events:none}
 .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
-.cam-ui.clean .hide-clean{display:none!important}
-.clean-hint{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);transform:translateX(-50%);font-size:13px}
-/* photo, cart */
-.photo{width:100%;border-radius:var(--r);border:1px solid var(--line);display:block;background:#000;max-height:58vh;object-fit:contain}
-.actions3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.act{color:var(--fg);text-decoration:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:14px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:600}
-.act svg{width:22px;height:22px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px}
-.line{display:flex;justify-content:space-between;gap:10px;font-variant-numeric:tabular-nums}
-.ok-badge{width:60px;height:60px;border-radius:50%;border:1.5px solid var(--accent);display:grid;place-items:center;color:var(--accent);margin:0 auto}
+/* foto y carrito */
+.photo{width:100%;border-radius:12px;border:1.5px solid var(--line);display:block;background:var(--img);max-height:56vh;object-fit:contain}
+.actions3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.actions3 .btn{min-height:44px;font-size:12px;padding:0 6px;text-decoration:none}
+.ok-badge{width:64px;height:64px;border-radius:50%;border:2px solid var(--ok);display:grid;place-items:center;color:var(--ok);margin:4px auto 0}
 .ok-badge svg{width:28px;height:28px}
-.upsell{display:flex;align-items:center;gap:12px;border:1px dashed #5A4520;border-radius:14px;padding:12px}
-.upsell .tx{flex:1;font-size:14px}
-.upsell button{background:none;border:0;color:var(--accent);font-weight:700}
-/* viewer */
-#viewer3d{flex:1;min-height:320px;border-radius:var(--r);background:radial-gradient(ellipse at 50% 40%,#2C1E14 0%,#141312 70%);position:relative;overflow:hidden;touch-action:none}
+.item{flex-direction:row;align-items:center;gap:12px}
+.item canvas{width:56px;height:56px;border-radius:10px;background:var(--img);flex:none}
+.item strong{font:700 15px/20px var(--body);display:block}
+.upsell{flex-direction:row;align-items:center;gap:12px;font-size:14px;line-height:20px}
+.upsell .tx{flex:1}
+/* visor 3D */
+#viewer3d{flex:1;min-height:320px;border-radius:12px;background:radial-gradient(ellipse at 50% 40%,#2C1E14 0%,var(--img) 70%);position:relative;overflow:hidden;touch-action:none;border:1px solid #2a2a2a}
 #viewer3d canvas{position:absolute;inset:0;width:100%;height:100%}
-.drag-hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);font-size:13px;color:var(--muted);pointer-events:none}
-/* overlay: ayuda y errores */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:max(12px,env(safe-area-inset-left,0px))}
+#viewer3d .tl{position:absolute;left:10px;top:10px;background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+#viewer3d .tr{position:absolute;right:10px;top:10px}
+.drag-hint{position:absolute;bottom:10px;left:10px;font:700 12px/16px var(--body);color:#ddd;background:#000;border-radius:999px;padding:4px 10px;pointer-events:none}
+/* ayuda, mensajes */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:20}
 .overlay[hidden]{display:none!important}
-.overlay .sheet{width:100%;max-width:460px;text-align:left;margin:0 0 env(safe-area-inset-bottom,0px)}
-.overlay .sheet h2{font-size:24px}
+.overlay .sheet{width:100%;max-width:460px;margin:0}
 .hand-anim{width:84px;height:84px;margin:0 auto;color:var(--accent)}
 .hand-anim .open{animation:open 2.4s infinite} .hand-anim .fist{animation:fist 2.4s infinite}
 @keyframes open{0%,45%{opacity:1}55%,100%{opacity:0}} @keyframes fist{0%,45%{opacity:0}55%,100%{opacity:1}}
-.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);background:var(--surface-2);border:1px solid var(--line);padding:12px 16px;border-radius:14px;font-size:14px;z-index:30;max-width:90vw}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);background:var(--control);border:1.5px solid var(--line);padding:12px 16px;border-radius:12px;font-size:14px;z-index:30;max-width:90vw}
 .loading{display:flex;flex-direction:column;align-items:center;gap:14px;justify-content:center;flex:1;text-align:center}
 .spin{width:40px;height:40px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp 0.9s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.spin,.hand-anim .open,.hand-anim .fist{animation:none}.hand-anim .fist{opacity:0}}
-@media (min-width:900px){ .cam-ui .scan-card,.cam-ui .tryon{max-width:440px;align-self:flex-start} }
+.msg-card{margin-top:auto;margin-bottom:auto;text-align:center;align-items:stretch;gap:12px;padding:22px}
+.msg-card .cam-badge{border-color:var(--err);color:var(--err);width:64px;height:64px;margin:0 auto}
+.msg-card .cam-badge svg{width:28px;height:28px}
+@media (prefers-reduced-motion:reduce){.spin,.hand-anim .open,.hand-anim .fist,.guide .scanline{animation:none}.hand-anim .fist{opacity:0}}
+@media (min-width:900px){ .cam-ui .sheet,.cam-ui .scan-text{max-width:460px;margin-left:auto;margin-right:auto;border-radius:28px 28px 0 0} }
 </style>
 </head>
 <body>
 
-<!-- SVG icons -->
+<!-- Íconos y emblema de Tempo (emblema tomado del UI Kit) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
-  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <defs>
+    <linearGradient id="tlg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2C46D"/><stop offset="0.55" stop-color="#B26A1E"/><stop offset="1" stop-color="#8A4A12"/></linearGradient>
+    <linearGradient id="tlr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C0392B"/><stop offset="1" stop-color="#7A1610"/></linearGradient>
+  </defs>
+  <symbol id="emblem" viewBox="0 0 100 100"><path d="M38 88 C20 75 14 45 26 18 M62 88 C80 75 86 45 74 18" stroke="url(#tlg)" stroke-width="5" stroke-dasharray="7 4" fill="none"/><path d="M36 92 L64 83 M64 92 L36 83" stroke="url(#tlg)" stroke-width="2.2" stroke-linecap="round"/><rect x="35" y="22" width="30" height="5" rx="1" fill="url(#tlg)"/><rect x="35" y="70" width="30" height="5" rx="1" fill="url(#tlg)"/><rect x="37" y="27" width="2" height="43" fill="url(#tlg)"/><rect x="61" y="27" width="2" height="43" fill="url(#tlg)"/><path d="M41 27 H59 C59 39 52 44 50 48.5 C48 44 41 39 41 27 Z M41 70 H59 C59 58 52 53 50 48.5 C48 53 41 58 41 70 Z" fill="url(#tlr)"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 10V7a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
-  <symbol id="i-flip" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0114-5l2 2M20 12a8 8 0 01-14 5l-2-2M20 4v5h-5M4 20v-5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1.1-1.5 2.3M12 17h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-flip" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0114-5l2 2M20 12a8 8 0 01-14 5l-2-2M20 4v5h-5M4 20v-5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><path d="M9.2 9.2a2.9 2.9 0 115.1 1.9c-1 .9-2.3 1.5-2.3 3.2M12 18h.01" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v6M12 7.5h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
-  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 12v7h14v-7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-  <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M3 4h2l2.2 10.2a1.5 1.5 0 001.5 1.2h8.6a1.5 1.5 0 001.5-1.1L21 8H6.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.5" cy="19.5" r="1.3" fill="currentColor"/><circle cx="17" cy="19.5" r="1.3" fill="currentColor"/></symbol>
 </svg>
 
-<!-- 1 · Intro -->
+<!-- AR 1 · Intro -->
 <section class="screen" id="s-intro" aria-labelledby="t-intro">
   <div class="wrap">
-    <div class="top"><span class="brand">TEMPO</span></div>
+    <div class="bar center"><span class="brandmark"><svg aria-hidden="true"><use href="#emblem"/></svg>TEMPO</span></div>
     <div class="hero-glove" id="hero"></div>
     <div class="eyebrow">Realidad aumentada</div>
     <h1 id="t-intro">Probalo en tu mano</h1>
-    <p class="lead">Contanos cómo entrenás y cuánto pesás: te recomendamos las onzas y te probás el guante con la cámara.</p>
+    <p class="body2">Contanos cómo entrenás y cuánto pesás: te recomendamos las onzas justas y te probás el guante con la cámara.</p>
     <ol class="steps">
       <li><b>1</b>Dos preguntas para elegir tus onzas</li>
       <li><b>2</b>Mostrá tu mano a la cámara</li>
@@ -210,189 +216,189 @@ p{margin:0;line-height:1.5}
     </ol>
     <div class="footer">
       <button class="btn" data-go="s-q1">Empezar</button>
-      <button class="link" id="know-oz">Ya sé mis onzas</button>
+      <button class="link amber" id="know-oz">Ya sé mis onzas</button>
       <div class="notice" id="file-notice" hidden><svg><use href="#i-info"/></svg><span>Abriste el archivo directamente: las preguntas funcionan, pero para usar la cámara hay que abrirlo desde un servidor o una dirección https. Mirá el archivo LEEME.</span></div>
       <p class="privacy"><svg><use href="#i-lock"/></svg>No guardamos fotos ni video de tu cámara.</p>
-      <p class="credit" id="scan-credit" hidden></p>
+      <p class="credit" id="scan-credit">Prototipo de UX (UADE).</p>
     </div>
   </div>
 </section>
 
-<!-- 2 · Pregunta 1 -->
+<!-- AR 2 · ¿Sparring o entrenamiento? -->
 <section class="screen" id="s-q1" hidden aria-labelledby="t-q1">
   <div class="wrap">
-    <div class="top"><button class="icon-btn" data-go="s-intro" aria-label="Volver"><svg><use href="#i-back"/></svg></button><div class="ttl">Pregunta 1 de 2</div><span class="spacer"></span></div>
+    <div class="bar"><button class="icon-btn" data-go="s-intro" aria-label="Volver"><svg><use href="#i-back"/></svg></button><span class="kick">Volver</span></div>
+    <div class="progress-l">Progreso · Pregunta 1 de 2</div>
     <div class="progress" aria-hidden="true"><i class="on"></i><i></i></div>
     <div class="eyebrow">Tu entrenamiento</div>
     <h2 id="t-q1">¿Para qué vas a usar los guantes?</h2>
-    <p class="muted">Las onzas cambian según el uso: para sparring se usa un guante más acolchado, que cuida tu mano y la de tu compañero.</p>
-    <div class="opts" role="radiogroup" aria-labelledby="t-q1" id="opts-uso">
-      <button class="opt" role="radio" aria-checked="false" data-val="sparring"><span class="ic">VS</span><span class="tx"><strong>Sparring</strong><span>Guanteo con un compañero, peleas</span></span><span class="rd"></span></button>
-      <button class="opt" role="radio" aria-checked="false" data-val="entrenamiento"><span class="ic">BOL</span><span class="tx"><strong>Entrenamiento</strong><span>Bolsa, manoplas, técnica y clases</span></span><span class="rd"></span></button>
+    <p class="body2">Las onzas cambian según el uso: para sparring se usa un guante más acolchado, que cuida tu mano y la de tu compañero.</p>
+    <div class="chips-col" role="radiogroup" aria-labelledby="t-q1" id="opts-uso">
+      <button class="card opt" role="radio" aria-checked="false" data-val="sparring"><strong>Sparring</strong><span>Guanteo con un compañero, peleas</span></button>
+      <button class="card opt" role="radio" aria-checked="false" data-val="entrenamiento"><strong>Entrenamiento</strong><span>Bolsa, manoplas, técnica y clases</span></button>
     </div>
     <div class="footer"><button class="btn" id="q1-next" disabled>Siguiente</button></div>
   </div>
 </section>
 
-<!-- 3 · Pregunta 2 -->
+<!-- AR 3 · ¿Cuánto pesás? -->
 <section class="screen" id="s-q2" hidden aria-labelledby="t-q2">
   <div class="wrap">
-    <div class="top"><button class="icon-btn" data-go="s-q1" aria-label="Volver"><svg><use href="#i-back"/></svg></button><div class="ttl">Pregunta 2 de 2</div><span class="spacer"></span></div>
+    <div class="bar"><button class="icon-btn" data-go="s-q1" aria-label="Volver"><svg><use href="#i-back"/></svg></button><span class="kick">Volver</span></div>
+    <div class="progress-l">Progreso · Pregunta 2 de 2</div>
     <div class="progress" aria-hidden="true"><i class="on"></i><i class="on"></i></div>
     <div class="eyebrow">Lo más importante</div>
     <h2 id="t-q2">¿Cuánto pesás?</h2>
-    <p class="muted">Tu peso corporal es lo que más define las onzas del guante.</p>
-    <div class="opts" role="radiogroup" aria-labelledby="t-q2" id="opts-peso">
-      <button class="opt" role="radio" aria-checked="false" data-val="0"><span class="tx"><strong>Menos de 55 kg</strong></span><span class="rd"></span></button>
-      <button class="opt" role="radio" aria-checked="false" data-val="1"><span class="tx"><strong>55 a 70 kg</strong></span><span class="rd"></span></button>
-      <button class="opt" role="radio" aria-checked="false" data-val="2"><span class="tx"><strong>70 a 85 kg</strong></span><span class="rd"></span></button>
-      <button class="opt" role="radio" aria-checked="false" data-val="3"><span class="tx"><strong>Más de 85 kg</strong></span><span class="rd"></span></button>
+    <p class="body2">Tu peso corporal es lo que más define las onzas del guante.</p>
+    <div class="chips-col" role="radiogroup" aria-labelledby="t-q2" id="opts-peso">
+      <button class="chip" role="radio" aria-checked="false" data-val="0">Menos de 55 kg</button>
+      <button class="chip" role="radio" aria-checked="false" data-val="1">55 a 70 kg</button>
+      <button class="chip" role="radio" aria-checked="false" data-val="2">70 a 85 kg</button>
+      <button class="chip" role="radio" aria-checked="false" data-val="3">Más de 85 kg</button>
     </div>
-    <p class="chosen">Uso elegido: <b id="uso-label">—</b></p>
+    <p class="muted" style="text-align:center">Uso elegido: <b id="uso-label" style="color:var(--accent)">—</b></p>
     <div class="footer"><button class="btn" id="q2-next" disabled>Ver mi recomendación</button></div>
   </div>
 </section>
 
-<!-- 4 · Recomendación -->
+<!-- AR 4 · Onzas recomendadas y modelo -->
 <section class="screen" id="s-reco" hidden aria-labelledby="t-reco">
   <div class="wrap">
-    <div class="top"><button class="icon-btn" id="reco-back" aria-label="Volver"><svg><use href="#i-back"/></svg></button><div class="ttl" id="t-reco">Tu recomendación</div><span class="spacer"></span></div>
-    <div class="reco" id="reco-box"></div>
+    <div class="bar"><button class="icon-btn" id="reco-back" aria-label="Volver"><svg><use href="#i-back"/></svg></button><span class="kick" id="t-reco">Tu recomendación</span></div>
+    <div class="eyebrow" id="reco-kick"></div>
+    <div class="card result" id="reco-box"></div>
     <div class="notice" id="oz-notice" hidden><svg><use href="#i-info"/></svg><span id="oz-notice-tx"></span></div>
-    <p class="muted">Elegí qué guante probarte</p>
-    <div class="opts" role="radiogroup" aria-label="Modelos" id="models"></div>
+    <p class="caption" style="font-size:14px">Elegí qué guante probarte</p>
+    <div class="chips-col" role="radiogroup" aria-label="Modelos" id="models"></div>
     <div class="footer"><button class="btn" id="reco-next">Probarme el guante</button><p class="muted" style="text-align:center">Guía orientativa: si tenés dudas, consultá con tu entrenador.</p></div>
   </div>
 </section>
 
-<!-- 5 · Permiso de cámara -->
-<section class="screen" id="s-perm" hidden aria-labelledby="t-perm" style="background:radial-gradient(ellipse at 50% 20%,#2C1E14 0%,#111113 65%)">
-  <div class="wrap">
-    <div class="top"><button class="icon-btn" data-go="s-reco" aria-label="Volver"><svg><use href="#i-back"/></svg></button><span style="flex:1"></span></div>
-    <div class="sheet">
-      <div class="badge"><svg><use href="#i-cam"/></svg></div>
+<!-- AR 5 · Permiso de cámara -->
+<section class="screen" id="s-perm" hidden aria-labelledby="t-perm">
+  <div class="wrap" style="text-align:center">
+    <div class="bar"><button class="icon-btn" data-go="s-reco" aria-label="Volver"><svg><use href="#i-back"/></svg></button><span class="kick">Volver</span></div>
+    <div style="margin:auto 0;display:flex;flex-direction:column;gap:16px">
+      <div class="cam-badge"><svg><use href="#i-cam"/></svg></div>
       <h2 id="t-perm">Necesitamos tu cámara</h2>
-      <p class="lead">Usamos la cámara solo para detectar tu mano y mostrarte el guante encima, en tiempo real. Todo pasa en tu dispositivo.</p>
-      <span class="pill"><svg><use href="#i-lock"/></svg>No grabamos ni guardamos imágenes</span>
+      <p class="body2" id="perm-text">Usamos la cámara solo para detectar tu mano y mostrarte el guante encima, en tiempo real. Todo pasa en tu celular.</p>
+      <div class="card privacy-card"><svg><use href="#i-lock"/></svg>No grabamos ni guardamos imágenes.</div>
+    </div>
+    <div class="footer">
       <button class="btn" id="perm-yes">Permitir cámara</button>
-      <button class="btn ghost" id="perm-no">Ahora no, ver en 3D</button>
+      <button class="link u" id="perm-no">Ahora no</button>
     </div>
   </div>
 </section>
 
-<!-- 6/7 · Cámara: escaneo y guante puesto -->
+<!-- AR 6 y AR 7 · Escaneo de la mano y guante puesto en vivo -->
 <section class="screen" id="s-cam" hidden aria-label="Probador con cámara">
   <div id="stage">
     <video id="video" playsinline muted autoplay></video>
     <canvas id="dots"></canvas>
     <canvas id="gl"></canvas>
-    <div class="frame" id="frame"><i></i><i></i><i></i><i></i></div>
+    <div class="guide" id="frame" aria-hidden="true"><span class="scanline"></span></div>
     <div class="countdown" id="countdown" hidden></div>
     <div class="flash" id="flash"></div>
   </div>
   <div class="cam-ui" id="cam-ui">
-    <div class="cam-top hide-clean">
-      <button class="icon-btn" id="cam-back" aria-label="Salir del probador"><svg><use href="#i-back"/></svg></button>
-      <div class="grow"><span class="chip" id="status-chip" role="status" aria-live="polite"><span class="led"></span><span id="status-tx">Iniciando cámara…</span></span></div>
+    <div class="cam-top">
+      <button class="icon-btn" id="cam-back" aria-label="Salir del probador"><svg><use href="#i-close"/></svg></button>
+      <div class="grow"><span class="pill" id="status-chip" role="status" aria-live="polite"><span id="status-tx">Iniciando cámara…</span></span></div>
       <button class="icon-btn" id="cam-help" aria-label="Ayuda"><svg><use href="#i-help"/></svg></button>
+      <button class="icon-btn" id="cam-flip" aria-label="Cambiar de cámara" hidden><svg><use href="#i-flip"/></svg></button>
     </div>
-    <span class="chip reco-chip hide-clean" id="reco-chip" hidden></span>
-    <div class="side-tools hide-clean">
-      <button class="icon-btn" id="cam-flip" aria-label="Cambiar de cámara"><svg><use href="#i-flip"/></svg></button>
-      <button class="icon-btn" id="cam-clean" aria-label="Ocultar la interfaz" hidden><svg><use href="#i-eye"/></svg></button>
+    <span class="tag size size-tag" id="size-tag" hidden>Largo 43 cm</span>
+    <div id="pins" hidden>
+      <button class="pin" id="pin1" aria-label="Zona 1: puño">1</button>
+      <button class="pin" id="pin2" aria-label="Zona 2: cuero">2</button>
     </div>
+    <div class="card notice zone" id="zone" hidden role="status"><div style="flex:1"><div class="eyebrow" id="zone-k"></div><strong id="zone-t"></strong><div class="muted" id="zone-d"></div></div><button class="icon-btn" id="zone-close" aria-label="Cerrar" style="width:36px;height:36px"><svg><use href="#i-close"/></svg></button></div>
 
-    <!-- tarjeta de escaneo -->
-    <div class="scan-card hide-clean" id="scan-card">
-      <h3 id="scan-title">Mostrá tu mano</h3>
-      <p class="muted" id="scan-sub">Palma abierta, dedos separados y la mano entera dentro del marco. Después cerrá el puño.</p>
-      <div class="meter"><i id="scan-meter"></i></div>
-      <div class="stats">
-        <div class="stat"><span>Luz</span><b id="st-light">—</b></div>
-        <div class="stat"><span>Distancia</span><b id="st-dist">—</b></div>
-        <div class="stat"><span>Puntos</span><b id="st-pts">0/21</b></div>
-      </div>
-      <div id="scan-error" hidden>
+    <!-- AR 6 -->
+    <div class="scan-text" id="scan-card">
+      <h2 id="scan-title">Mostrá la palma abierta</h2>
+      <p id="scan-sub">Dedos separados, mano entera dentro del marco. Después cerrá el puño para ver el guante.</p>
+      <div class="scan-error" id="scan-error" hidden>
         <ul class="tips" id="scan-tips"></ul>
-        <div class="row" style="margin-top:10px"><button class="btn quiet" id="scan-retry">Reintentar</button><button class="btn quiet" data-go="s-viewer">Ver en 3D</button></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn sec m" id="scan-retry">Reintentar</button><button class="btn sec m" id="scan-flip">Cambiar cámara</button></div>
+        <button class="link u" data-go="s-viewer">Ver el guante en 3D</button>
+      </div>
+      <div class="cam-chips">
+        <span class="pill">Luz <b id="st-light">—</b></span>
+        <span class="pill">Distancia <b id="st-dist">—</b></span>
+        <span class="pill">Puntos <b id="st-pts">0 / 21</b></span>
       </div>
     </div>
 
-    <!-- hoja del guante puesto -->
-    <div class="tryon hide-clean" id="tryon" hidden>
-      <div class="prod"><canvas id="thumb-cam" width="96" height="96"></canvas><div class="tx"><strong id="to-name">Tempo Elite</strong><span id="to-desc"></span></div></div>
-      <div class="row" role="radiogroup" aria-label="Color" id="to-colors"></div>
-      <div class="buy-row">
-        <div class="price"><b id="to-price"></b><span id="to-stock"></span></div>
-        <button class="timer-btn" id="timer-btn" aria-pressed="false" aria-label="Temporizador de 3 segundos">3 s</button>
-        <button class="shutter" id="shutter" aria-label="Sacar foto"></button>
-        <button class="btn buy" id="to-buy">Comprar</button>
+    <!-- AR 7 -->
+    <div class="sheet" id="tryon" hidden>
+      <div class="name" id="to-name">Tempo Elite</div>
+      <div class="muted" id="to-desc"></div>
+      <div class="row">
+        <div class="swatches" role="radiogroup" aria-label="Color" id="to-colors"></div>
+        <span class="ok-tx" id="to-stock">En stock</span>
+        <span class="price" id="to-price"></span>
       </div>
+      <div class="two"><button class="btn sec m" id="to-photo"><svg><use href="#i-cam"/></svg>Foto</button><button class="btn m" id="to-buy">Agregar</button></div>
     </div>
-    <button class="chip clean-hint" id="clean-exit" hidden>Mostrar controles</button>
   </div>
 </section>
 
-<!-- 8 · Foto -->
+<!-- AR 8 · Foto y compartir -->
 <section class="screen" id="s-photo" hidden aria-labelledby="t-photo">
   <div class="wrap">
-    <div class="top"><button class="icon-btn" id="photo-back" aria-label="Volver al probador"><svg><use href="#i-back"/></svg></button><div class="ttl" id="t-photo">Tu foto con Tempo</div><span class="spacer"></span></div>
+    <div class="bar"><button class="icon-btn" id="photo-back" aria-label="Volver al probador"><svg><use href="#i-back"/></svg></button><span class="kick" id="t-photo">Tu foto con Tempo</span></div>
     <img class="photo" id="photo-img" alt="Foto con el guante Tempo puesto">
     <div class="actions3">
-      <a class="act" id="photo-save" download="tempo-probador.jpg" href="#"><svg><use href="#i-down"/></svg>Guardar</a>
-      <button class="act" id="photo-share"><svg><use href="#i-share"/></svg>Compartir</button>
-      <button class="act" id="photo-redo"><svg><use href="#i-redo"/></svg>Repetir</button>
+      <a class="btn sec" id="photo-save" download="tempo-probador.jpg" href="#">Guardar</a>
+      <button class="btn sec" id="photo-share">Instagram</button>
+      <button class="btn sec" id="photo-redo">Repetir</button>
     </div>
     <div class="footer"><button class="btn" id="photo-cart">Agregar al carrito</button></div>
   </div>
 </section>
 
-<!-- 9 · Carrito -->
+<!-- AR 9 · Agregado al carrito -->
 <section class="screen" id="s-cart" hidden aria-labelledby="t-cart">
   <div class="wrap">
-    <div class="top"><span class="spacer"></span><span style="flex:1"></span><button class="icon-btn" id="cart-close" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>
+    <div class="bar"><button class="icon-btn" id="cart-close" aria-label="Volver"><svg><use href="#i-back"/></svg></button><div class="grow"><svg width="34" height="34" aria-label="Tempo"><use href="#emblem"/></svg></div><span class="icon-btn" aria-label="Carrito: 1 producto"><svg><use href="#i-cart"/></svg><span class="count" id="cart-count">1</span></span></div>
     <div class="ok-badge"><svg><use href="#i-check"/></svg></div>
-    <h2 id="t-cart" style="text-align:center">¡Agregado al carrito!</h2>
-    <div class="card">
-      <div class="line"><strong id="c-name"></strong><strong id="c-price"></strong></div>
-      <div class="muted" id="c-meta"></div>
-      <div class="line muted"><span id="c-cuotas"></span></div>
-      <div class="line" style="color:var(--accent);font-size:14px"><span id="c-transfer"></span></div>
-    </div>
-    <div class="upsell"><div class="tx">Sumá las <b>Tempo Wraps</b> (3,5 m) · <span id="c-wraps"></span></div><button id="add-wraps">+ Agregar</button></div>
+    <h2 id="t-cart" style="text-align:center">Agregado al carrito</h2>
+    <div class="card item"><canvas id="c-thumb" width="112" height="112" aria-hidden="true"></canvas><div><strong id="c-name"></strong><div class="muted" id="c-meta"></div></div></div>
+    <div><div class="price" id="c-price"></div><div class="eyebrow" id="c-cuotas" style="margin-top:4px"></div><div class="muted" id="c-transfer"></div></div>
+    <div class="card upsell"><div class="tx">Sumá las Tempo Wraps (3,5 m) · <span id="c-wraps"></span></div><button class="btn sec s" id="add-wraps">+ Agregar</button></div>
     <div class="footer">
-      <button class="btn" id="cart-checkout">Finalizar compra</button>
-      <button class="btn ghost" id="cart-more">Seguir probando</button>
+      <button class="btn" id="cart-checkout">Ir al carrito</button>
+      <button class="link" id="cart-more">Seguir probando</button>
       <p class="muted" style="text-align:center">Envíos con Andreani o retiro en punto TEMPO.</p>
     </div>
   </div>
 </section>
 
-<!-- Visor 3D sin cámara -->
+<!-- Visor 3D sin cámara ("Ahora no") -->
 <section class="screen" id="s-viewer" hidden aria-labelledby="t-viewer">
   <div class="wrap">
-    <div class="top"><button class="icon-btn" id="viewer-back" aria-label="Volver"><svg><use href="#i-back"/></svg></button><div class="ttl" id="t-viewer">Visor 3D</div><span class="spacer"></span></div>
-    <div id="viewer3d"><span class="drag-hint">Arrastrá para girar el guante</span></div>
-    <div class="card">
-      <div class="line"><strong id="v-name"></strong><strong id="v-price"></strong></div>
-      <div class="row" role="radiogroup" aria-label="Color" id="v-colors"></div>
-    </div>
+    <div class="bar"><button class="icon-btn" id="viewer-back" aria-label="Volver"><svg><use href="#i-back"/></svg></button><span class="kick" id="t-viewer">Visor 3D</span></div>
+    <div id="viewer3d"><button class="tag tl" id="viewer-ar" style="cursor:pointer;padding:6px 10px;font-size:11px">Probalo en AR</button><span class="tag size tr" id="v-size" hidden>Largo 43 cm</span><span class="drag-hint">Arrastrá para girar</span></div>
+    <div class="t3" id="v-name"></div>
+    <div class="row" style="display:flex;align-items:center;gap:10px"><div class="swatches" role="radiogroup" aria-label="Color" id="v-colors"></div><span class="price" id="v-price" style="margin-left:auto;font-size:20px"></span></div>
     <div class="footer">
-      <button class="btn" id="viewer-cam">Probar con la cámara</button>
-      <button class="btn ghost" id="viewer-buy">Agregar al carrito</button>
+      <button class="btn" id="viewer-cam">Probalo en tu mano</button>
+      <button class="btn sec" id="viewer-buy">Agregar al carrito</button>
     </div>
   </div>
 </section>
 
-<!-- Pantalla de carga / error -->
+<!-- Carga y errores -->
 <section class="screen" id="s-msg" hidden aria-live="polite">
   <div class="wrap">
-    <div class="top"><button class="icon-btn" id="msg-back" aria-label="Volver"><svg><use href="#i-back"/></svg></button><span style="flex:1"></span></div>
+    <div class="bar"><button class="icon-btn" id="msg-back" aria-label="Volver"><svg><use href="#i-back"/></svg></button><span class="kick">Volver</span></div>
     <div class="loading" id="msg-loading"><div class="spin"></div><p id="msg-loading-tx">Cargando el detector de manos…</p></div>
-    <div class="sheet" id="msg-error" hidden>
-      <div class="badge" style="border-color:var(--err);color:var(--err)"><svg><use href="#i-info"/></svg></div>
+    <div class="card msg-card" id="msg-error" hidden>
+      <div class="cam-badge"><svg><use href="#i-info"/></svg></div>
       <h2 id="msg-title"></h2>
-      <p class="lead" id="msg-text"></p>
+      <p class="body2" id="msg-text"></p>
       <ul class="tips" id="msg-steps" style="text-align:left"></ul>
       <div id="msg-actions" style="display:flex;flex-direction:column;gap:10px"></div>
     </div>
@@ -401,7 +407,7 @@ p{margin:0;line-height:1.5}
 
 <!-- Ayuda -->
 <div class="overlay" id="help" hidden role="dialog" aria-modal="true" aria-labelledby="t-help">
-  <div class="sheet">
+  <div class="sheet" style="border-radius:28px 28px 0 0">
     <svg class="hand-anim" viewBox="0 0 64 64" aria-hidden="true">
       <g class="open" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M22 52c-6-6-10-12-10-18l4-4 6 6V12a3 3 0 016 0v18-22a3 3 0 016 0v22-18a3 3 0 016 0v20-12a3 3 0 016 0v20c0 8-4 14-10 16H26"/></g>
       <g class="fist" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><rect x="16" y="20" width="32" height="24" rx="10"/><path d="M24 20v10M32 20v10M40 20v10M16 32h-2a4 4 0 010-8h4M24 44v8h16v-8"/></g>
@@ -411,8 +417,7 @@ p{margin:0;line-height:1.5}
       <li>Usá la cámara trasera y mostrá tu otra mano, o la frontal en la compu.</li>
       <li>Primero palma abierta dentro del marco; después cerrá el puño.</li>
       <li>Buscá buena luz y que la mano no quede cortada.</li>
-      <li>Para la foto, activá el temporizador de 3 s: así no necesitás tocar la pantalla con la mano que estás probando.</li>
-      <li>Tocá el ojo para ocultar los controles y ver solo el guante.</li>
+      <li>Tocá los números sobre el guante para ver los detalles de cada zona.</li>
     </ul>
     <button class="btn" id="help-close">Entendido</button>
   </div>
@@ -427,14 +432,19 @@ p{margin:0;line-height:1.5}
 /* ================= CONFIG: datos del catálogo (tomados del MVP de Tempo) ================= */
 const CONFIG = {
   models: {
-    elite: { name:'Tempo Elite', cierre:'cordones', desc:'Cordones · Peleas y sparring de alto nivel', material:'Cuero genuino', price:209999 },
-    pro:   { name:'Tempo Pro',   cierre:'velcro',   desc:'Velcro reforzado · Entrenamiento diario y sparring', material:'Cuero', price:168999 },
-    fit:   { name:'Tempo Fit',   cierre:'velcro',   desc:'Velcro ajustable · Clases y principiantes', material:'Sintético', price:132999 }
+    // fullName, tagline, largo y zonas del Elite: ficha técnica y textos del UI Kit
+    elite: { name:'Tempo Elite', fullName:'Tempo Elite – Guantes de Cuero con Cordones', cierre:'cordones', desc:'Cordones · Peleas y sparring de alto nivel', tagline:'Ajuste ceñido, de competencia.', material:'Cuero genuino', price:209999, largo:'43 cm',
+             zones:[ {k:'Zona 1 · Puño', t:'Puño de cuero genuino', d:'Firme en la muñeca y resistente al uso exigente.'}, {k:'Zona 2 · Material', t:'100% cuero genuino premium', d:'Cierre con cordones tradicionales.'} ] },
+    pro:   { name:'Tempo Pro',   cierre:'velcro',   desc:'Velcro reforzado · Entrenamiento diario y sparring', material:'Cuero', price:168999,
+             zones:[ {k:'Zona 1 · Puño', t:'Cierre de velcro reforzado', d:''}, {k:'Zona 2 · Material', t:'Cuero', d:''} ] },
+    fit:   { name:'Tempo Fit',   cierre:'velcro',   desc:'Velcro ajustable · Clases y principiantes', material:'Sintético', price:132999,
+             zones:[ {k:'Zona 1 · Puño', t:'Cierre de velcro ajustable', d:''}, {k:'Zona 2 · Material', t:'Sintético', d:''} ] }
   },
   // Talles con stock por modelo. En el MVP todos figuran en 16 oz: actualizar cuando haya más talles.
   stock: { elite:[16], pro:[16], fit:[16] },
-  colors: { blanco:{label:'Blanco', leather:'#E9E2D4', trim:'#D6CDBD', thread:'#EFE9DE', lace:'#F4EFE6', logo:'#C9A24A'},
-            negro:{label:'Negro',  leather:'#151413', trim:'#2B2927', thread:'#3A3734', lace:'#151515', logo:'#D8B260'} },
+  // Colores del cuero según las fotos de los guantes Tempo (blanco y negro con detalles dorados y rojos)
+  colors: { blanco:{label:'Blanco', leather:'#F4F2EE', trim:'#E8E4DC', thread:'#F2EFE9', lace:'#F7F5F0', logo:'#C9A24A', hex:'#F4F2EE'},
+            negro:{label:'Negro',  leather:'#121212', trim:'#1E1E1E', thread:'#2A2A2A', lace:'#F2EFE9', logo:'#D8B260', hex:'#1A1A1A'} },
   // Modelos 3D escaneados (opcional). Ej.: elite: { blanco:'models/elite-blanco.glb', negro:'models/elite-negro.glb' }
   glbFit: { up:'y', back:'z', thumb:1, length:2.37, wrist:0.22 },
   wraps: 24999,
@@ -450,7 +460,8 @@ const S = { uso:null, peso:null, ozRec:16, ozTry:16, model:'elite', color:'blanc
 
 /* ================= Utilidades ================= */
 const $ = (id) => document.getElementById(id);
-const money = (n, dec=false) => '$ ' + new Intl.NumberFormat('es-AR',{minimumFractionDigits:dec?2:0, maximumFractionDigits:dec?2:0}).format(n);
+const money = (n) => new Intl.NumberFormat('es-AR',{minimumFractionDigits:2, maximumFractionDigits:2}).format(n) + '$';
+const tagline = (m) => m.tagline || m.desc.split(' · ')[1] || '';
 const isTouch = matchMedia('(pointer: coarse)').matches;
 const HAS_HANDS = typeof Hands !== 'undefined';
 const IS_FILE = location.protocol === 'file:';
@@ -471,7 +482,7 @@ function drawGlove2D(canvas, colorKey){
 const ready3D = (async () => {
   if (!HAS_WEBGL) return false;
   try { G3 = await import('./glove3d.js'); THREE = G3.THREE; await G3.prepare(CONFIG); CAN_3D = true;
-    G3.modelInfo().then(c => { if (!c) return; const el = $('scan-credit'); el.innerHTML = `Forma del guante: escaneo 3D real <a href="${c.source}" target="_blank" rel="noopener">“${c.title}”</a>, licencia <a href="${c.licenseUrl}" target="_blank" rel="noopener">${c.license}</a>. Adaptado para el probador.`; el.hidden = false; });
+    G3.modelInfo().then(c => { if (!c) return; const el = $('scan-credit'); el.innerHTML = `Prototipo de UX (UADE). Forma del guante: escaneo 3D <a href="${c.source}" target="_blank" rel="noopener">“${c.title}”</a>, licencia <a href="${c.licenseUrl}" target="_blank" rel="noopener">${c.license}</a>, adaptado con el diseño de Tempo.`; });
     return true; }
   catch (e) { console.warn('3D no disponible:', e); return false; }
 })();
@@ -565,10 +576,12 @@ function pickTryOz(){ const av = availableOz(S.model); S.ozTry = av.includes(S.o
 function renderReco(){
   const box = $('reco-box');
   if (S.knowOz){
-    box.innerHTML = `<div class="why"><b>Elegí tu guante</b>Todos los modelos están disponibles en 16 oz. Elegí uno para probártelo.</div>`;
+    $('reco-kick').textContent = 'Elegí tu guante';
+    box.innerHTML = `<div class="display">16<small>Oz</small></div><div class="why"><span class="eyebrow">Talle disponible</span>Todos los modelos están en 16 Oz. Elegí uno para probártelo.</div>`;
   } else {
-    const why = S.uso==='sparring' ? 'Más acolchado para cuidar tu mano y la de tu compañero.' : 'Buen equilibrio entre protección y velocidad para bolsa y manoplas.';
-    box.innerHTML = `<div class="oz">${S.ozRec}<small> oz</small></div><div class="why"><b>${S.uso==='sparring'?'Para sparring':'Para entrenamiento'} · ${PESOS[S.peso]}</b>${why}</div>`;
+    const why = S.uso==='sparring' ? 'Más acolchado: cuida tu mano y la de tu compañero.' : 'Buen equilibrio entre protección y velocidad para bolsa y manoplas.';
+    $('reco-kick').textContent = `${S.uso==='sparring'?'Para sparring':'Para entrenamiento'} · ${PESOS[S.peso]}`;
+    box.innerHTML = `<div class="display">${S.ozRec}<small>Oz</small></div><div class="why"><span class="eyebrow">Te recomendamos</span>${why}</div>`;
   }
   renderModels(); updateOzNotice();
 }
@@ -576,12 +589,11 @@ function renderModels(){
   const wrap = $('models'); wrap.innerHTML='';
   const ideal = S.knowOz ? null : (S.uso==='sparring' ? 'elite' : 'pro');
   Object.entries(CONFIG.models).forEach(([key,m]) => {
-    const b = document.createElement('button'); b.className='model'; b.setAttribute('role','radio'); b.setAttribute('aria-checked', String(key===S.model));
-    const av = availableOz(key);
-    b.innerHTML = `<canvas width="128" height="128" aria-hidden="true"></canvas><span class="tx"><strong>${m.name}</strong>${key===ideal?'<span class="tag">IDEAL</span>':''}<div class="meta">${m.desc}</div><div class="stock">Hay stock en ${av.join(', ')} oz</div></span><span class="price">${money(m.price)}</span>`;
+    const b = document.createElement('button'); b.className='card model'; b.setAttribute('role','radio'); b.setAttribute('aria-checked', String(key===S.model));
+    const av = availableOz(key), cierre = m.desc.split(' · ')[0].split(' ')[0];
+    b.innerHTML = `<span class="r1"><strong>${m.name}</strong>${key===ideal?'<span class="tag">Ideal</span>':''}</span><span class="meta">${cierre} · ${av.join(', ')} Oz</span><span class="r3"><b>${money(m.price)}</b><span class="ok-tx">En stock</span></span>`;
     b.onclick = () => { S.model=key; wrap.querySelectorAll('.model').forEach(x=>x.setAttribute('aria-checked', String(x===b))); updateOzNotice(); $('reco-next').textContent = 'Probarme el ' + m.name; };
     wrap.appendChild(b);
-    thumbR(key, S.color, b.querySelector('canvas'));
   });
   $('reco-next').textContent = 'Probarme el ' + CONFIG.models[S.model].name;
 }
@@ -590,10 +602,10 @@ function updateOzNotice(){
   const n = $('oz-notice');
   if (!S.knowOz && S.ozTry !== S.ozRec){
     n.hidden=false;
-    $('oz-notice-tx').textContent = `Para tu perfil recomendamos ${S.ozRec} oz, pero hoy el ${CONFIG.models[S.model].name} está disponible en ${availableOz(S.model).join(', ')} oz. Podés probarte el de ${S.ozTry} oz para ver el tamaño o consultarnos por otros talles.`;
+    $('oz-notice-tx').textContent = `Para tu perfil recomendamos ${S.ozRec} Oz, pero hoy el ${CONFIG.models[S.model].name} está disponible en ${availableOz(S.model).join(', ')} Oz. Podés probarte el de ${S.ozTry} Oz para ver el tamaño o consultarnos por otros talles.`;
   } else n.hidden=true;
 }
-$('reco-next').onclick = () => go('s-perm');
+$('reco-next').onclick = () => { $('perm-text').textContent = `Usamos la cámara solo para detectar tu mano y mostrarte el ${CONFIG.models[S.model].name} encima, en tiempo real. Todo pasa en tu celular.`; go('s-perm'); };
 $('perm-no').onclick = () => go('s-viewer');
 $('perm-yes').onclick = () => startCamera();
 
@@ -602,20 +614,21 @@ function renderColorSwatches(container, onChange){
   container.innerHTML='';
   Object.entries(CONFIG.colors).forEach(([key,c]) => {
     const b = document.createElement('button'); b.className='swatch'; b.setAttribute('role','radio'); b.setAttribute('aria-checked', String(key===S.color));
-    b.style.background = c.leather; b.setAttribute('aria-label', c.label); b.title = c.label;
+    b.innerHTML = `<i style="background:${c.hex||c.leather}"></i>`; b.setAttribute('aria-label', c.label); b.title = c.label;
     b.onclick = () => { S.color=key; container.querySelectorAll('.swatch').forEach(x=>x.setAttribute('aria-checked', String(x===b))); onChange(); };
     container.appendChild(b);
   });
-  const lab = document.createElement('span'); lab.className='muted'; lab.textContent = CONFIG.colors[S.color].label; lab.id = container.id+'-label'; container.appendChild(lab);
 }
 function openViewer(){
   const m = CONFIG.models[S.model];
-  $('v-name').textContent = `${m.name} · ${S.ozTry} oz`; $('v-price').textContent = money(m.price);
-  renderColorSwatches($('v-colors'), () => { $('v-colors-label').textContent = CONFIG.colors[S.color].label; viewer.refresh(); });
+  $('v-name').textContent = `${m.name} · ${S.ozTry} Oz`; $('v-price').textContent = money(m.price);
+  $('v-size').hidden = !m.largo; if (m.largo) $('v-size').textContent = 'Largo ' + m.largo;
+  renderColorSwatches($('v-colors'), () => viewer.refresh());
 }
 const _go = go; go = function(id){ if (id==='s-viewer') { pickTryOz(); openViewer(); } _go(id); };
 $('viewer-back').onclick = () => go('s-reco');
 $('viewer-cam').onclick = () => go('s-perm');
+$('viewer-ar').onclick = () => go('s-perm');
 $('viewer-buy').onclick = () => openCart();
 
 /* ================= Cámara + detección de manos ================= */
@@ -627,7 +640,7 @@ let phase = 'scan';            // 'scan' | 'on'
 let seenFrames=0, lastSeen=0, scanStart=0, smooth=null, openK=0.9, lightLevel=null;
 const LOST_MS = 600, NOHAND_MS = 8000;
 
-function setStatus(text, kind){ $('status-tx').textContent = text; const c=$('status-chip'); c.className = 'chip' + (kind?' '+kind:''); }
+function setStatus(text, kind){ $('status-tx').textContent = text; const c=$('status-chip'); c.className = 'pill' + (kind==='ok'?' ok':kind==='err'?' err':''); }
 
 function initHands(){
   if (handsReady) return handsReady;
@@ -729,19 +742,11 @@ async function setupScene(){
   }
   glove3.setColor(S.color);
   const m = CONFIG.models[S.model];
-  // con el escaneo real todos los modelos se ven con abrojo: se aclara para no confundir con el Elite de cordones
-  const cierreTx = () => (glove3.scan && m.cierre === 'cordones') ? 'Cordones (la vista 3D muestra abrojo)' : m.desc.split(' · ')[0];
-  $('to-name').textContent = m.name; $('to-desc').textContent = `${cierreTx()} · ${CONFIG.colors[S.color].label} · ${S.ozTry} oz`;
+  const nameTx = () => `${m.name} · ${CONFIG.colors[S.color].label} · ${S.ozTry} Oz`;
+  $('to-name').textContent = nameTx(); $('to-desc').textContent = tagline(m);
   $('to-price').textContent = money(m.price);
-  $('to-stock').textContent = `En stock · Hasta ${CONFIG.cuotas} cuotas sin interés`;
-  renderColorSwatches($('to-colors'), () => {
-    glove3.setColor(S.color); $('to-colors-label').textContent = CONFIG.colors[S.color].label;
-    $('to-desc').textContent = `${cierreTx()} · ${CONFIG.colors[S.color].label} · ${S.ozTry} oz`;
-    thumbR(S.model, S.color, $('thumb-cam'));
-  });
-  const oz = document.createElement('span'); oz.className='oz-chip'; oz.textContent = `${S.ozTry} oz`; $('to-colors').appendChild(oz);
-  thumbR(S.model, S.color, $('thumb-cam'));
-  $('reco-chip').textContent = S.knowOz ? `Probando ${S.ozTry} oz` : (S.ozTry===S.ozRec ? `✓ Recomendado para vos (${S.ozRec} oz)` : `Probando ${S.ozTry} oz · recomendado ${S.ozRec} oz`);
+  renderColorSwatches($('to-colors'), () => { glove3.setColor(S.color); $('to-name').textContent = nameTx(); });
+  $('size-tag').textContent = m.largo ? 'Largo ' + m.largo : '';
 }
 function layoutCam(){
   const w = innerWidth, h = innerHeight;
@@ -756,9 +761,10 @@ function layoutCam(){
 }
 function resetScan(){
   phase='scan'; seenFrames=0; lastSeen=0; scanStart=performance.now(); smooth=null; filters=null;
-  $('scan-card').hidden=false; $('tryon').hidden=true; $('frame').hidden=false; $('reco-chip').hidden=true; $('cam-clean').hidden=true;
-  $('scan-error').hidden=true; $('scan-title').textContent='Mostrá tu mano'; $('scan-sub').hidden=false;
-  $('scan-meter').style.width='0%'; setStatus('Buscando tu mano…','warn');
+  $('scan-card').hidden=false; $('tryon').hidden=true; $('frame').hidden=false; $('cam-flip').hidden=true; $('cam-help').hidden=false;
+  $('size-tag').hidden=true; $('pins').hidden=true; $('zone').hidden=true;
+  $('scan-error').hidden=true; $('scan-title').textContent='Mostrá la palma abierta'; $('scan-sub').hidden=false;
+  setStatus('Buscando tu mano…','warn');
   if (glove3) glove3.root.visible=false;
   if (stage) stage.updateShadow(null,null,0,false);
 }
@@ -816,13 +822,13 @@ function onResults(res){
   dctx.clearRect(0,0,view.w,view.h);
   const lms = res.multiHandLandmarks && res.multiHandLandmarks[0];
   if (!lms){
-    $('st-pts').textContent='0/21'; $('st-pts').className='';
+    $('st-pts').textContent='0 / 21'; $('st-pts').className='';
     $('st-dist').textContent='—'; $('st-dist').className='';
     if (phase==='scan'){
-      seenFrames = Math.max(0, seenFrames-2); $('scan-meter').style.width = Math.min(100, seenFrames/18*100)+'%';
+      seenFrames = Math.max(0, seenFrames-2);
       if (now - scanStart > NOHAND_MS && $('scan-error').hidden) showNoHand();
     } else if (now - lastSeen > LOST_MS){
-      glove3.root.visible = false; stage.updateShadow(null,null,0,false); setStatus('Buscando tu mano…','warn'); filters = null;
+      glove3.root.visible = false; stage.updateShadow(null,null,0,false); setStatus('Buscando tu mano…','warn'); filters = null; palmVote = 0; $('pins').hidden = true;
     }
     renderer3.render(scene3, cam3);
     return;
@@ -843,20 +849,21 @@ function onResults(res){
   const frac = Math.max(maxY-minY, maxX-minX) / Math.min(view.w, view.h);
   const tooClose = (maxY-minY) > view.h*0.88 || (maxX-minX) > view.w*0.92 || minY < -10 || maxY > view.h+10;
   const dist = $('st-dist');
-  if (frac < 0.22){ dist.textContent='Acercala'; dist.className='warn'; }
-  else if (tooClose){ dist.textContent='Alejala'; dist.className='warn'; }
-  else { dist.textContent='Bien'; dist.className='ok'; }
-  $('st-pts').textContent='21/21'; $('st-pts').className='ok';
+  // distancia aproximada: ancho de la palma (índice a meñique, ~8 cm) y un campo de visión horizontal típico de 63°
+  const palmPx = Math.hypot(lms[5].x*view.vw - lms[17].x*view.vw, lms[5].y*view.vh - lms[17].y*view.vh);
+  const cm = palmPx > 1 ? Math.round(8 * (view.vw/2/Math.tan(31.5*Math.PI/180)) / palmPx) : 0;
+  const ok = !(frac < 0.22) && !tooClose;
+  dist.textContent = cm ? `${cm} cm` : '—'; dist.className = ok ? 'ok' : 'warn';
+  $('st-pts').textContent='21 / 21'; $('st-pts').className='ok';
 
   if (phase==='scan'){
     drawSkeleton(smooth);
-    if (dist.className==='ok') seenFrames++;
-    $('scan-meter').style.width = Math.min(100, seenFrames/18*100)+'%';
-    $('scan-title').textContent = dist.className==='ok' ? 'Midiendo tu mano…' : (frac<0.22?'Acercá un poco la mano':'Alejá un poco la mano');
-    setStatus('Midiendo tu mano…','warn');
+    if (ok) seenFrames++;
+    $('scan-title').textContent = ok ? 'Mostrá la palma abierta' : (frac<0.22?'Acercá un poco la mano':'Alejá un poco la mano');
+    setStatus(`Midiendo tu mano… ${Math.min(100, Math.round(seenFrames/18*100))}%`,'warn');
     if (seenFrames >= 18) placeGlove();
   }
-  if (phase==='on') { setStatus('Guante colocado','ok'); updateGlove(smooth, rightOnScreen); }
+  if (phase==='on') { setStatus('✓ Guante colocado','ok'); updateGlove(smooth, palmSide(res, rightOnScreen)); }
   renderer3.render(scene3, cam3);
 }
 function drawSkeleton(p){
@@ -869,28 +876,55 @@ function showNoHand(){
   $('scan-error').hidden=false; $('scan-title').textContent='No detectamos tu mano'; $('scan-sub').hidden=true;
   const tips = ['Mostrá la palma abierta, con la mano entera dentro del marco.','Alejá el celular hasta ver la muñeca.'];
   if (lightLevel!=null && lightLevel<55) tips.unshift('Hay poca luz: acercate a una ventana o una lámpara.');
-  if (isTouch) tips.push('Si usás la cámara frontal, cambiá a la trasera con el botón de la derecha.');
+  if (isTouch) tips.push('Si usás la cámara frontal, cambiá a la trasera.');
   const ul=$('scan-tips'); ul.innerHTML=''; tips.forEach(t=>{const li=document.createElement('li'); li.textContent=t; ul.appendChild(li);});
   setStatus('Sin mano detectada','err');
 }
 $('scan-retry').onclick = () => resetScan();
+$('scan-flip').onclick = () => $('cam-flip').click();
 function placeGlove(){
   phase='on';
-  $('scan-card').hidden=true; $('tryon').hidden=false; $('frame').hidden=true; $('reco-chip').hidden=false; $('cam-clean').hidden=false;
+  $('scan-card').hidden=true; $('tryon').hidden=false; $('frame').hidden=true; $('cam-flip').hidden=false; $('cam-help').hidden=true;
+  $('size-tag').hidden = !$('size-tag').textContent; $('pins').hidden=false;
+  requestAnimationFrame(() => document.documentElement.style.setProperty('--sheet-h', $('tryon').offsetHeight+'px'));
   glove3.root.visible = true;
   if (navigator.vibrate) try{ navigator.vibrate(30); }catch(_){}
 }
-function updateGlove(p, rightOnScreen){
+/* ¿El vector n = (índice − meñique) × (muñeca → nudillo medio) apunta al dorso?
+   Se decide con dos pistas: la curvatura de los dedos en 3D (los dedos y el pulgar siempre se doblan
+   hacia la palma) y la etiqueta de mano de MediaPipe. La primera no depende de la etiqueta ni del
+   espejado de la cámara, así el guante no queda al revés. Se acumula con histéresis para que no parpadee. */
+let palmVote = 0;
+function palmSide(res, rightOnScreen){
+  const byLabel = rightOnScreen ? -1 : 1;                      // +1: n apunta al dorso
+  const w = res.multiHandWorldLandmarks && res.multiHandWorldLandmarks[0];
+  let vote = byLabel * 0.35;
+  if (w){
+    const P = w.map(q => [view.mirror ? -q.x : q.x, -q.y, -q.z]);
+    const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], cr=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]], dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+    const up = sub(P[9],P[0]), n = cr(sub(P[5],P[17]), up);
+    const nl = Math.hypot(...n), ul = Math.hypot(...up);
+    if (nl > 1e-9 && ul > 1e-9){
+      let c = 0; for (const i of [3,4,6,7,8,10,11,12,14,15,16,18,19,20]) c += dot(sub(P[i],P[9]), n) / (nl*ul);
+      // c < 0: las puntas quedan del lado −n (la palma está en −n), entonces n es el dorso
+      vote += THREE.MathUtils.clamp(-c / 1.2, -1, 1);
+    }
+  }
+  palmVote = THREE.MathUtils.clamp(palmVote*0.8 + vote*0.2, -1, 1);
+  return palmVote >= 0 ? 1 : -1;
+}
+function updateGlove(p, nIsBack){
   const wrist=V(p[0]), idx=V(p[5]), mid=V(p[9]), pky=V(p[17]), tip=V(p[12]);
   const upv = new THREE.Vector3().subVectors(mid, wrist);
   const palm = upv.length(); if (palm < 8) return;
   const up = upv.clone().normalize();
   const across = new THREE.Vector3().subVectors(idx, pky); across.addScaledVector(up, -across.dot(up)).normalize();
   const n = new THREE.Vector3().crossVectors(across, up).normalize();
-  const back = rightOnScreen ? n.clone().negate() : n.clone();
+  const back = nIsBack > 0 ? n.clone() : n.clone().negate();
   const xl = new THREE.Vector3().crossVectors(up, back).normalize();
   const thumbSign = Math.sign(across.dot(xl)) || 1;
   glove3.setThumbSide(thumbSign);
+  window.__ar = { nIsBack, palmVote:+palmVote.toFixed(2), thumbSign, back:[+back.x.toFixed(2),+back.y.toFixed(2),+back.z.toFixed(2)] };   // diagnóstico (pruebas)
   // Se amolda: el cuerpo del guante se acorta al cerrar el puño
   const o = tip.distanceTo(wrist) / palm;                       // ~1.0 puño … ~1.9 mano abierta
   const target = THREE.MathUtils.clamp(0.74 + (o-1.0)/(1.9-1.0)*(1.12-0.74), 0.74, 1.14);
@@ -902,6 +936,10 @@ function updateGlove(p, rightOnScreen){
   m.setPosition(wrist.x, wrist.y, wrist.z);
   glove3.root.matrix.copy(m); glove3.root.matrixWorldNeedsUpdate = true;
   glove3.root.visible = true;
+  // pines: 1 en el puño (lado del meñique) y 2 arriba del acolchado (lado del pulgar), en coordenadas del guante
+  const at = (x, y) => { const q = new THREE.Vector3(x*thumbSign, y, 0).applyMatrix4(m); return [q.x, -q.y]; };
+  const [p1x,p1y] = at(-0.62, 0.16), [p2x,p2y] = at(0.48, 1.62);
+  $('pin1').style.left = p1x+'px'; $('pin1').style.top = p1y+'px'; $('pin2').style.left = p2x+'px'; $('pin2').style.top = p2y+'px';
 }
 
 /* Controles de la vista de cámara */
@@ -910,11 +948,14 @@ $('cam-help').onclick = () => { $('help').hidden=false; $('help-close').focus();
 $('help-close').onclick = () => $('help').hidden=true;
 $('help').addEventListener('click', e => { if (e.target.id==='help') $('help').hidden=true; });
 $('cam-flip').onclick = async () => { S.facing = S.facing==='user' ? 'environment' : 'user'; stopCamera(); await startCamera(); };
-$('cam-clean').onclick = () => { $('cam-ui').classList.add('clean'); $('clean-exit').hidden=false; };
-$('clean-exit').onclick = () => { $('cam-ui').classList.remove('clean'); $('clean-exit').hidden=true; };
-$('timer-btn').onclick = () => { S.timer=!S.timer; $('timer-btn').setAttribute('aria-pressed', String(S.timer)); toast(S.timer?'Temporizador activado: la foto se saca 3 segundos después de tocar.':'Temporizador desactivado.'); };
-$('shutter').onclick = () => S.timer ? countdown(3) : takePhoto();
+$('to-photo').onclick = () => takePhoto();
 $('to-buy').onclick = () => openCart();
+function showZone(i){
+  const z = (CONFIG.models[S.model].zones || [])[i]; if (!z) return;
+  $('zone-k').textContent = z.k; $('zone-t').textContent = z.t; $('zone-d').textContent = z.d; $('zone-d').hidden = !z.d; $('zone').hidden = false;
+}
+$('pin1').onclick = () => showZone(0); $('pin2').onclick = () => showZone(1);
+$('zone-close').onclick = () => $('zone').hidden = true;
 function countdown(n){
   const el=$('countdown'); el.hidden=false; el.textContent=n;
   const iv=setInterval(()=>{ n--; if(n<=0){ clearInterval(iv); el.hidden=true; takePhoto(); } else el.textContent=n; },1000);
@@ -932,25 +973,33 @@ function takePhoto(){
   g.restore();
   renderer3.render(scene3, cam3);
   g.drawImage(glCanvas, 0, 0, w, h);
-  // Marca Tempo
-  const band = Math.round(h*0.16);
-  const grd = g.createLinearGradient(0,h-band,0,h); grd.addColorStop(0,'rgba(0,0,0,0)'); grd.addColorStop(1,'rgba(0,0,0,.72)');
-  g.fillStyle=grd; g.fillRect(0,h-band,w,band);
-  const pad = Math.round(w*0.05), fs = Math.round(Math.min(w,h)*0.045);
-  g.fillStyle='#F2B865'; g.font=`900 ${fs}px "Archivo Black","Arial Black",sans-serif`; g.textBaseline='alphabetic';
-  g.fillText('TEMPO', pad, h - pad - fs*1.25);
-  g.fillStyle='#F4EFE6'; g.font=`600 ${Math.round(fs*0.62)}px Archivo, Arial, sans-serif`;
-  g.fillText(`${CONFIG.models[S.model].name} · ${CONFIG.colors[S.color].label} · ${S.ozTry} oz`, pad, h - pad);
+  // Marca como en el UI Kit: TEMPO arriba a la izquierda; modelo y hashtag abajo a la izquierda
+  const pad = Math.round(w*0.05), fs = Math.round(Math.min(w,h)*0.05);
+  let grd = g.createLinearGradient(0,0,0,h*0.18); grd.addColorStop(0,'rgba(0,0,0,.55)'); grd.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=grd; g.fillRect(0,0,w,h*0.18);
+  grd = g.createLinearGradient(0,h*0.8,0,h); grd.addColorStop(0,'rgba(0,0,0,0)'); grd.addColorStop(1,'rgba(0,0,0,.7)'); g.fillStyle=grd; g.fillRect(0,h*0.8,w,h*0.2);
+  if ('fontStretch' in g) g.fontStretch = 'expanded';
+  if ('letterSpacing' in g) g.letterSpacing = Math.round(fs*0.18)+'px';
+  g.fillStyle='#FFFFFF'; g.font=`800 ${fs}px Archivo, "Arial Black", sans-serif`; g.textBaseline='top'; g.fillText('TEMPO', pad, pad);
+  if ('fontStretch' in g) g.fontStretch = 'normal';
+  if ('letterSpacing' in g) g.letterSpacing = '0px';
+  g.textBaseline='alphabetic'; g.fillStyle='#E6E6E6'; g.font=`700 ${Math.round(fs*0.5)}px Lato, Arial, sans-serif`;
+  g.fillText(`${CONFIG.models[S.model].name} · ${CONFIG.colors[S.color].label} · ${S.ozTry} Oz`, pad, h - pad - fs*0.72);
+  g.fillStyle='#C8C8C8'; g.font=`400 ${Math.round(fs*0.46)}px Lato, Arial, sans-serif`;
+  g.fillText('@tempo__ok · #DominaTuRitmo', pad, h - pad);
   const fl=$('flash'); fl.style.opacity='0.8'; setTimeout(()=>fl.style.opacity='0',120);
   c.toBlob(b => {
     photoBlob=b; if (photoURL) URL.revokeObjectURL(photoURL); photoURL=URL.createObjectURL(b);
     $('photo-img').src=photoURL; $('photo-save').href=photoURL;
     stopCamera(); _go('s-photo'); current='s-photo';
-    const canShare = navigator.canShare && navigator.canShare({ files:[new File([b],'tempo.jpg',{type:'image/jpeg'})] });
-    $('photo-share').hidden = !canShare;
+    $('photo-cart').textContent = `Agregar al carrito · ${money(CONFIG.models[S.model].price)}`;
   }, 'image/jpeg', 0.92);
 }
-$('photo-share').onclick = async () => { try { await navigator.share({ files:[new File([photoBlob],'tempo-probador.jpg',{type:'image/jpeg'})], text:'Me probé el guante Tempo #DominaTuRitmo' }); } catch(_){} };
+// Instagram: se abre el menú de compartir del celular con la foto (ahí aparece Instagram); si no hay, se descarga
+$('photo-share').onclick = async () => {
+  const file = new File([photoBlob],'tempo-probador.jpg',{type:'image/jpeg'});
+  if (navigator.canShare && navigator.canShare({ files:[file] })) { try { await navigator.share({ files:[file], text:'Me probé el guante Tempo @tempo__ok #DominaTuRitmo' }); } catch(_){} }
+  else { $('photo-save').click(); toast('Guardamos la foto: subila a Instagram y etiquetá a @tempo__ok.'); }
+};
 $('photo-redo').onclick = () => startCamera();
 $('photo-back').onclick = () => startCamera();
 $('photo-cart').onclick = () => openCart();
@@ -960,18 +1009,19 @@ let backFromCart = 's-reco';
 function openCart(){
   backFromCart = current === 's-viewer' ? 's-viewer' : 's-reco';
   const m = CONFIG.models[S.model];
-  $('c-name').textContent = m.name; $('c-price').textContent = money(m.price);
-  $('c-meta').textContent = `${CONFIG.colors[S.color].label} · ${S.ozTry} oz · x1`;
-  $('c-cuotas').textContent = `Hasta ${CONFIG.cuotas} cuotas sin interés de ${money(m.price/CONFIG.cuotas, true)}`;
-  $('c-transfer').textContent = `${Math.round(CONFIG.transferOff*100)} % off con transferencia: ${money(m.price*(1-CONFIG.transferOff), true)}`;
+  $('c-name').textContent = m.fullName || m.name; $('c-price').textContent = money(m.price);
+  $('c-meta').textContent = `${CONFIG.colors[S.color].label} · ${S.ozTry} Oz · x1`;
+  $('c-cuotas').textContent = `Hasta ${CONFIG.cuotas} cuotas sin interés`;
+  $('c-transfer').textContent = `${Math.round(CONFIG.transferOff*100)}% off con transferencia`;
   $('c-wraps').textContent = money(CONFIG.wraps);
-  $('add-wraps').disabled=false; $('add-wraps').textContent='+ Agregar';
+  $('add-wraps').disabled=false; $('add-wraps').textContent='+ Agregar'; $('cart-count').textContent='1';
+  thumbR(S.model, S.color, $('c-thumb'));
   go('s-cart');
 }
-$('add-wraps').onclick = () => { $('add-wraps').textContent='Agregadas ✓'; $('add-wraps').disabled=true; };
+$('add-wraps').onclick = () => { $('add-wraps').textContent='Agregadas ✓'; $('add-wraps').disabled=true; $('cart-count').textContent='2'; };
 $('cart-close').onclick = () => go(backFromCart);
 $('cart-more').onclick = () => go('s-reco');
-$('cart-checkout').onclick = () => toast('Este prototipo no procesa pagos: en la tienda, este botón lleva al checkout.');
+$('cart-checkout').onclick = () => toast('Este prototipo no procesa compras: en la tienda, este botón lleva al carrito.');
 
 /* Pausar la cámara si la pestaña queda en segundo plano */
 document.addEventListener('visibilitychange', () => { if (document.hidden && current==='s-cam') { stopCamera(); _go('s-perm'); current='s-perm'; } });

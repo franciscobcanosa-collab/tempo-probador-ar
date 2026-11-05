@@ -37,6 +37,11 @@ y abrís `http://localhost:8000` en Chrome. Usa la webcam.
 
 Pantallas de error: navegador sin soporte, permiso de cámara denegado, sin cámara, falla al cargar el detector y "No detectamos tu mano", con consejos y la opción de reintentar.
 
+## Diseño
+
+- Las pantallas siguen el **UI Kit** y los **wireframes de media fidelidad** del equipo (AR 1 a AR 9): fondo #141414 con resplandor rojo, acento ámbar #F2B866, títulos en Archivo expandida 800 en mayúsculas, textos en Lato, botones píldora, chips, cards con borde ámbar al seleccionar, marco punteado y línea de escaneo en AR 6, pines 1 y 2, etiqueta "Largo 43 cm" y panel inferior con Foto y Agregar en AR 7, y precios con el formato 209.999,00$.
+- El guante lleva el diseño de Tempo: emblema de laureles y reloj de arena en el dorso y en el costado, placa dorada TEMPO en el puño y, en el Elite, lengüeta, ojales y cordones del lado de la palma. Blanco o negro.
+
 ## Cómo funciona
 
 - **Detección de la mano:** MediaPipe Hands (Google) en el navegador. Encuentra 21 puntos de la mano en cada cuadro del video.
@@ -53,6 +58,7 @@ Pantallas de error: navegador sin soporte, permiso de cámara denegado, sin cám
   - Sombra suave detrás del guante.
   - Grano de cámara, más fuerte con poca luz.
   - Nitidez del render igualada a la del video.
+- **Palma o dorso:** se decide con la curvatura de los dedos en 3D (siempre se doblan hacia la palma) y la etiqueta de mano de MediaPipe, con histéresis. Así el guante no queda al revés aunque la etiqueta falle o la cámara esté espejada.
 - **Seguimiento:** en cada cuadro se calcula la orientación de la mano (muñeca, nudillos del índice, medio y meñique) y el guante se ubica, rota y escala sobre ella. Un filtro One Euro elimina el temblor sin agregar retraso. La mano izquierda y la derecha se distinguen para poner el pulgar y los cordones del lado correcto.
 - **Orden de carga del guante:** primero el escaneo real procesado (`models/tempo-scan.*`), después el guante esculpido y, si ninguno carga, una versión simple armada por código.
 

@@ -112,6 +112,94 @@ function makeLogoTextures() {
   const normal = new THREE.CanvasTexture(nc); normal.colorSpace = THREE.NoColorSpace;
   return { alpha, normal };
 }
+/* ===================== Diseño Tempo: emblema y placa ===================== */
+// Arma, a partir de un dibujo en canvas, las texturas de un calco: color con transparencia, metal (dorado = 1),
+// rugosidad y relieve. pintar(g, capa) dibuja con capa = 'oro' | 'rojo' | 'todo'.
+function decalTextures(W, H, pintar) {
+  const mkC = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
+  const col = mkC(), g = col.getContext('2d'); pintar(g, 'todo', W, H);
+  const met = mkC(), gm = met.getContext('2d'); gm.fillStyle = '#000'; gm.fillRect(0, 0, W, H);
+  gm.save(); pintar(gm, 'oro', W, H, '#fff'); gm.restore();
+  // metalness lee el canal azul y roughness el verde: dorado = metal 1 y rugosidad 0,3; rojo = esmalte brillante
+  const md = gm.getImageData(0, 0, W, H), cd = g.getImageData(0, 0, W, H).data;
+  for (let i = 0; i < md.data.length; i += 4) { const m = md.data[i] / 255; md.data[i + 1] = (0.42 - 0.12 * m) * 255; md.data[i + 2] = m * 255; }
+  gm.putImageData(md, 0, 0);
+  // relieve: alto = alfa suavizado (estampado en relieve)
+  const nc = mkC(), ng = nc.getContext('2d'), out = ng.createImageData(W, H);
+  const A = new Float32Array(W * H); for (let i = 0; i < W * H; i++) A[i] = cd[i * 4 + 3] / 255;
+  const at = (x, y) => A[Math.min(H - 1, Math.max(0, y)) * W + Math.min(W - 1, Math.max(0, x))];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const nx = (at(x - 2, y) - at(x + 2, y)) * 1.2, ny = (at(x, y - 2) - at(x, y + 2)) * 1.2, l = Math.hypot(nx, ny, 1), i = (y * W + x) * 4;
+    out.data[i] = (nx / l * 0.5 + 0.5) * 255; out.data[i + 1] = (ny / l * 0.5 + 0.5) * 255; out.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; out.data[i + 3] = 255;
+  }
+  ng.putImageData(out, 0, 0);
+  const tex = (c, srgb) => { const t = new THREE.CanvasTexture(c); t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 8; return t; };
+  return { color: tex(col, true), mr: tex(met, false), normal: tex(nc, false) };
+}
+function goldFill(g, x0, y0, x1, y1, solid) {
+  if (solid) return solid;
+  const gr = g.createLinearGradient(x0, y0, x1, y1);
+  gr.addColorStop(0, '#F6D27E'); gr.addColorStop(0.45, '#D9A548'); gr.addColorStop(0.75, '#B8812E'); gr.addColorStop(1, '#E6BC62'); return gr;
+}
+// Emblema de Tempo: laureles dorados y reloj de arena rojo con marco dorado (misma geometría que el emblema del UI Kit)
+function makeEmblemTextures() {
+  return decalTextures(1024, 1024, (g, capa, W, H, solid) => {
+    const k = W / 100; g.save(); g.scale(k, k); g.translate(0, -2);
+    const gold = goldFill(g, 0, 15, 0, 95, solid);
+    if (capa !== 'rojo') {
+      g.fillStyle = gold; g.strokeStyle = gold;
+      // ramas: curva de Bézier del emblema y hojas a lo largo, alternando hacia afuera y hacia adentro
+      const branch = (sx) => {
+        const P = [[38, 88], [20, 75], [14, 45], [26, 18]].map(([x, y]) => [50 + (x - 50) * sx, y]);
+        const at = (t) => { const u = 1 - t; return [0, 1].map(i => u*u*u*P[0][i] + 3*u*u*t*P[1][i] + 3*u*t*t*P[2][i] + t*t*t*P[3][i]); };
+        g.lineWidth = 1.6; g.beginPath(); g.moveTo(...P[0]); g.bezierCurveTo(...P[1], ...P[2], ...P[3]); g.stroke();
+        const N = 11;
+        for (let i = 0; i < N; i++) {
+          const t = 0.06 + i / (N - 1) * 0.9, p = at(t), q = at(Math.min(1, t + 0.01)), ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
+          const sz = 1 - t * 0.35;
+          for (const side of [-1, 1]) {
+            g.save(); g.translate(p[0], p[1]); g.rotate(ang + side * sx * 0.75);
+            g.beginPath(); g.ellipse(4.2 * sz, 0, 4.6 * sz, 1.9 * sz, 0, 0, Math.PI * 2); g.fill(); g.restore();
+          }
+        }
+        const tip = at(1); g.save(); g.translate(...tip); g.rotate(-Math.PI / 2 + sx * 0.25); g.beginPath(); g.ellipse(3.5, 0, 4, 1.7, 0, 0, Math.PI * 2); g.fill(); g.restore();
+      };
+      branch(1); branch(-1);
+      // cinta cruzada abajo
+      g.lineCap = 'round'; g.lineWidth = 2.6; g.beginPath(); g.moveTo(36, 93); g.lineTo(64, 84); g.moveTo(64, 93); g.lineTo(36, 84); g.stroke();
+      // marco del reloj de arena
+      const rr = (x, y, w, h) => { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, 1) : g.rect(x, y, w, h); g.fill(); };
+      rr(34, 21, 32, 5.5); rr(34, 69.5, 32, 5.5); g.fillRect(36.5, 26, 2.4, 44); g.fillRect(61.1, 26, 2.4, 44);
+    }
+    if (capa !== 'oro') {
+      const red = solid || (() => { const r = g.createLinearGradient(0, 27, 0, 70); r.addColorStop(0, '#D23A2C'); r.addColorStop(0.5, '#A8231A'); r.addColorStop(1, '#7A1610'); return r; })();
+      g.fillStyle = red; g.beginPath();
+      g.moveTo(41, 27); g.lineTo(59, 27); g.bezierCurveTo(59, 39, 52, 44, 50, 48.5); g.bezierCurveTo(48, 44, 41, 39, 41, 27); g.closePath();
+      g.moveTo(41, 70); g.lineTo(59, 70); g.bezierCurveTo(59, 58, 52, 53, 50, 48.5); g.bezierCurveTo(48, 53, 41, 58, 41, 70); g.closePath(); g.fill();
+    }
+    g.restore();
+  });
+}
+// Placa del puño: doble marco dorado y TEMPO en letras romanas
+function makePlaqueTextures() {
+  return decalTextures(1024, 400, (g, capa, W, H, solid) => {
+    if (capa === 'rojo') return;
+    const gold = goldFill(g, 0, 0, 0, H, solid);
+    g.strokeStyle = gold; g.fillStyle = gold;
+    g.lineWidth = 16; g.strokeRect(14, 14, W - 28, H - 28);
+    g.lineWidth = 5; g.strokeRect(42, 42, W - 84, H - 84);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '700 200px Cinzel, "Trajan Pro", Georgia, "Times New Roman", serif';
+    if (g.letterSpacing !== undefined) g.letterSpacing = '18px';
+    g.fillText('TEMPO', W / 2 + 9, H / 2 + 12);
+  });
+}
+function decalMaterial(set) {
+  const m = new THREE.MeshPhysicalMaterial({ map: set.color, metalnessMap: set.mr, roughnessMap: set.mr, metalness: 1, roughness: 1,
+    normalMap: set.normal, normalScale: new THREE.Vector2(0.8, 0.8), clearcoat: 0.35, clearcoatRoughness: 0.3,
+    transparent: true, alphaTest: 0.35, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
+  m.userData.envMult = 2.4; return addGrain(m);
+}
 function makeShadowTexture() {
   const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
   const grd = g.createRadialGradient(128, 128, 10, 128, 128, 128);
@@ -138,7 +226,10 @@ export async function prepare(config) {
   try { await Promise.race([document.fonts.load('400 100px "Archivo Black"'), new Promise(r => setTimeout(r, 1500))]); } catch (_) { }
   TEX.leather = makeLeatherTextures(512);
   TEX.fabric = makeFabricTextures();
+  try { await Promise.race([document.fonts.load('700 100px Cinzel'), new Promise(r => setTimeout(r, 1500))]); } catch (_) { }
   TEX.logo = makeLogoTextures();
+  TEX.emblem = makeEmblemTextures();
+  TEX.plaque = makePlaqueTextures();
   TEX.shadow = makeShadowTexture();
   return true;
 }
@@ -426,14 +517,19 @@ export async function modelInfo() { try { return (await loadSculpt()).meta.scan 
 const V3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
 function gridDecal(d, lift = 0.008) {
   const pos = [], uv = [], idx = [];
+  const flipU = d.side !== undefined && d.side < 0;           // compatibilidad con los calcos del guante esculpido
   for (let j = 0; j < d.ny; j++) for (let i = 0; i < d.nx; i++) {
     const q = d.pts[j * d.nx + i]; pos.push(q[0] + q[3] * lift, q[1] + q[4] * lift, q[2] + q[5] * lift);
-    uv.push(d.side > 0 ? i / (d.nx - 1) : 1 - i / (d.nx - 1), j / (d.ny - 1));
+    uv.push(flipU ? 1 - i / (d.nx - 1) : i / (d.nx - 1), j / (d.ny - 1));
   }
   for (let j = 0; j < d.ny - 1; j++) for (let i = 0; i < d.nx - 1; i++) {
-    const a = j * d.nx + i, b = a + 1, c = a + d.nx, e = c + 1;
-    if (d.side > 0) idx.push(a, b, e, a, e, c); else idx.push(a, e, b, a, c, e);
+    const a = j * d.nx + i, b = a + 1, c = a + d.nx, e = c + 1; idx.push(a, b, e, a, e, c);
   }
+  // que las caras miren hacia afuera, igual que las normales de la superficie
+  const P = (k) => new THREE.Vector3(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]);
+  const m = Math.floor((d.ny - 1) / 2) * d.nx + Math.floor((d.nx - 1) / 2), q = d.pts[m];
+  const fn = new THREE.Vector3().crossVectors(P(m + 1).sub(P(m)), P(m + d.nx + 1).sub(P(m)));
+  if (fn.dot(new THREE.Vector3(q[3], q[4], q[5])) < 0) for (let k = 0; k < idx.length; k += 3) { const t = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = t; }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx); g.computeVertexNormals(); return g;
 }
@@ -467,15 +563,38 @@ async function sculptedGlove(modelKey) {
     stitchLine(target, pts.concat(line.length > 150 && Math.abs(line[0][1] - line[line.length - 1][1]) < 0.02 ? [pts[0]] : []));
   }
   upper.add(stitchMesh(up, thread)); lower.add(stitchMesh(lo, thread));
-  // logos
-  const logos = [];
-  const logo = new THREE.Mesh(gridDecal(meta.decals.logo, meta.scan ? 0.006 : 0.008), mkFoil()); (meta.scan ? upper : upperN).add(logo); logos.push(logo);
-  if (meta.scan) {
-    // escaneo real: el cierre de abrojo y las costuras ya están en la forma; solo se suma el logo de la faja
+  // logos y diseño
+  const logos = [], decals = [];
+  const addLaces = () => {
+    lower.add(new THREE.Mesh(gridDecal(meta.decals.tongue, 0.003), tongue));
+    const eyes = meta.eyelets.map(q => ({ p: V3(q), n: V3(q.slice(3)) }));
+    for (const e of eyes) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.019, 0.0075, 10, 24), metal); t.position.copy(e.p).addScaledVector(e.n, 0.004); t.lookAt(e.p.clone().addScaledVector(e.n, 1)); lower.add(t); }
+    const cx = eyes.reduce((a, e) => a + e.p.x, 0) / eyes.length;
+    const Ls = eyes.filter(e => e.p.x < cx).sort((a, b) => a.p.y - b.p.y), Rs = eyes.filter(e => e.p.x >= cx).sort((a, b) => a.p.y - b.p.y);
+    const lacePath = (seq) => { const pts = [];
+      for (let i = 0; i < seq.length; i++) { const e = seq[i]; pts.push(e.p.clone().addScaledVector(e.n, -0.004));
+        if (i < seq.length - 1) { const f = seq[i + 1], m = e.p.clone().lerp(f.p, 0.5), n = e.n.clone().lerp(f.n, 0.5).normalize(); pts.push(m.addScaledVector(n, 0.02 + (i % 2) * 0.008)); } }
+      return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), seq.length * 24, 0.0125, 10, false); };
+    lower.add(new THREE.Mesh(lacePath(Ls.map((e, i) => i % 2 ? Rs[i] : e)), lace));
+    lower.add(new THREE.Mesh(lacePath(Rs.map((e, i) => i % 2 ? Ls[i] : e)), lace));
+  };
+  if (meta.scan && meta.decals.emblem) {
+    // Diseño Tempo sobre el escaneo real: emblema de laureles y reloj de arena en el dorso y en el costado,
+    // placa dorada TEMPO en el puño y, en el modelo de cordones, lengüeta, ojales y cordones del lado de la palma.
+    // Los calcos van pegados a la malla espejada; la textura se da vuelta con la mano para que el texto se lea bien.
+    const put = (d, set, group, lift) => { const m = new THREE.Mesh(gridDecal(d, lift), decalMaterial({ color: set.color.clone(), mr: set.mr.clone(), normal: set.normal.clone() }));
+      for (const t of [m.material.map, m.material.metalnessMap, m.material.normalMap]) t.needsUpdate = true;
+      m.material.roughnessMap = m.material.metalnessMap; group.add(m); decals.push(m); };
+    put(meta.decals.emblem, TEX.emblem, upper, 0.005);
+    put(meta.decals.side, TEX.emblem, upper, 0.005);
+    put(meta.decals.plaque, TEX.plaque, lower, 0.005);
+    if (model.cierre === 'cordones' && meta.eyelets && meta.eyelets.length) addLaces();
+  } else if (meta.scan) {
+    const logo = new THREE.Mesh(gridDecal(meta.decals.logo, 0.006), mkFoil()); upper.add(logo); logos.push(logo);
     const cl = new THREE.Mesh(gridDecal(meta.decals.cuffLogo, 0.006), mkFoil()); lower.add(cl); logos.push(cl);
-    // el escaneo no es simétrico: el logo va pegado a la malla espejada y se da vuelta la textura para que se lea bien
     for (const l of logos) { const m = l.material; m.alphaMap = m.alphaMap.clone(); m.normalMap = m.normalMap.clone(); m.alphaMap.needsUpdate = m.normalMap.needsUpdate = true; }
   } else if (model.cierre === 'cordones') {
+    const logo = new THREE.Mesh(gridDecal(meta.decals.logo), mkFoil()); upperN.add(logo); logos.push(logo);
     lower.add(new THREE.Mesh(gridDecal(meta.decals.tongue, 0.003), tongue));
     const eyes = meta.eyelets.map(q => ({ p: V3(q), n: V3(q.slice(3)) }));
     for (const e of eyes) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.019, 0.0075, 10, 24), metal); t.position.copy(e.p).addScaledVector(e.n, 0.004); t.lookAt(e.p.clone().addScaledVector(e.n, 1)); lower.add(t); }
@@ -488,6 +607,7 @@ async function sculptedGlove(modelKey) {
     lower.add(new THREE.Mesh(lacePath(Rs.map((e, i) => i % 2 ? Ls[i] : e)), lace));
     const cl = new THREE.Mesh(gridDecal(meta.decals.cuffLogo), mkFoil()); lowerN.add(cl); logos.push(cl);
   } else {
+    const logo = new THREE.Mesh(gridDecal(meta.decals.logo), mkFoil()); upperN.add(logo); logos.push(logo);
     const rings = meta.strapRings, C = rings[0].length, off = 0.022, pos = [], uv = [], idx = [];
     rings.forEach((ring, r) => { for (let j = 0; j <= C; j++) { const q = ring[j % C]; pos.push(q[0] + q[3] * off, q[1] + q[4] * off, q[2] + q[5] * off); uv.push(j / C * 3.4, q[1]); } });
     for (let r = 0; r < rings.length - 1; r++) for (let j = 0; j < C; j++) { const a = r * (C + 1) + j, b = a + 1, c = a + C + 1, d = c + 1; idx.push(a, d, b, a, c, d); }
@@ -514,8 +634,8 @@ async function sculptedGlove(modelKey) {
     },
     setThumbSide(s) {
       mirror.scale.x = s >= 0 ? 1 : -1;
-      if (meta.scan) for (const l of logos) { const m = l.material, f = s >= 0 ? 1 : -1;
-        for (const t of [m.alphaMap, m.normalMap]) { t.repeat.x = f; t.offset.x = f < 0 ? 1 : 0; t.wrapS = THREE.RepeatWrapping; t.needsUpdate = true; }
+      if (meta.scan) for (const l of logos.concat(decals)) { const m = l.material, f = s >= 0 ? 1 : -1;
+        for (const t of new Set([m.alphaMap, m.normalMap, m.map, m.metalnessMap])) if (t) { t.repeat.x = f; t.offset.x = f < 0 ? 1 : 0; t.wrapS = THREE.RepeatWrapping; t.needsUpdate = true; }
         m.normalScale.x = Math.abs(m.normalScale.x) * f; }
     },
     setOpenness(k) {                      // el guante esculpido ya tiene forma de puño: solo se estira un poco con la mano abierta

@@ -12,7 +12,7 @@ El escaneo viene en milímetros, parado sobre el puño (Y hacia arriba), con el 
 y el abrojo (dorso) hacia -Z. El probador usa: Y hacia los dedos, +Z dorso, +X pulgar, y la
 unidad "palma" (el guante mide 2,35 de alto, con el borde del puño en y = -0,5).
 """
-import io, json, sys, time, urllib.request
+import io, json, os, sys, time, urllib.request
 import numpy as np
 import trimesh, fast_simplification, xatlas
 from scipy import ndimage
@@ -95,8 +95,13 @@ def main(out_prefix, src):
                                           target_reduction=max(0.0, 1 - TARGET_FACES / len(m.faces)))
     g = trimesh.Trimesh(v2, f2, process=True)
     g.remove_unreferenced_vertices(); g.fix_normals()
+    # las caras y normales tienen que mirar hacia afuera (volumen positivo); si no, el navegador muestra el interior
+    # del lado de atrás y el guante se ve al revés
+    if g.volume < 0: g.invert()
+    print('volumen', round(float(g.volume), 4), '(debe ser positivo)')
     print('simplificado', len(g.vertices), len(g.faces), f'{time.time()-t0:.1f}s')
     V0 = g.vertices.astype(np.float64); N0 = g.vertex_normals.astype(np.float64)
+    if (((V0 - V0.mean(0)) * N0).sum(1) > 0).mean() < 0.5: raise SystemExit('Normales hacia adentro: revisar la malla.')
     # oclusión ambiental desde un campo de distancias
     pitch = 0.012
     sd, origin = sdf_grid(g, pitch)
@@ -119,34 +124,13 @@ def main(out_prefix, src):
     uvscale = float(np.sqrt(area3 / (np.abs(e1[:, 0] * e2[:, 1] - e1[:, 1] * e2[:, 0]).sum() / 2)))
     print('uv', len(V), 'escala', round(uvscale, 3), f'{time.time()-t0:.1f}s')
 
-    # calcos (logo): rejilla proyectada sobre la superficie desde el dorso
-    TV = V0[g.faces]; E1 = TV[:, 1] - TV[:, 0]; E2 = TV[:, 2] - TV[:, 0]; NF = N0[g.faces]
-    def raycast(o, d):
-        """Intersección exacta rayo-triángulo (Möller-Trumbore); devuelve el primer impacto y la normal suavizada."""
-        P = o.copy(); Nn = np.tile(-d[0], (len(o), 1)); hit = np.zeros(len(o), bool)
-        for r in range(len(o)):
-            pv = np.cross(d[r], E2); det = (E1 * pv).sum(1); ok = np.abs(det) > 1e-12
-            inv = np.where(ok, 1 / np.where(ok, det, 1), 0); tv = o[r] - TV[:, 0]
-            u = (tv * pv).sum(1) * inv; qv = np.cross(tv, E1); v = (qv * d[r]).sum(1) * inv; t = (E2 * qv).sum(1) * inv
-            good = ok & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > 0)
-            if good.any():
-                k = np.where(good)[0][np.argmin(t[good])]; hit[r] = True
-                P[r] = o[r] + d[r] * t[k]; n = NF[k, 0] * (1 - u[k] - v[k]) + NF[k, 1] * u[k] + NF[k, 2] * v[k]; Nn[r] = n / np.linalg.norm(n)
-        return P, Nn, hit
-    def decal_grid(cx, cy, w, h, side=1, nx=33, ny=9):
-        gx, gy = np.meshgrid(np.linspace(cx - w / 2, cx + w / 2, nx), np.linspace(cy - h / 2, cy + h / 2, ny))
-        o = np.stack([gx.ravel(), gy.ravel(), np.full(gx.size, 1.2 * side)], -1)
-        d = np.tile([0, 0, -side], (len(o), 1)).astype(float)
-        P, Nn, got = raycast(o, d)
-        if not got.all():   # rellenar huecos con el vecino
-            j = np.argmin(np.linalg.norm(o[~got, None, :2] - o[None, got, :2], axis=2), axis=1)
-            P[~got] = P[got][j]; Nn[~got] = Nn[got][j]
-        return dict(nx=nx, ny=ny, w=w, h=h, side=side, pts=np.concatenate([P, Nn], 1).round(5).tolist())
-    # zona plana del dorso, arriba del abrojo, y sobre la faja de abrojo
+    # diseño de Tempo (emblema, placa, emblema lateral, ojales): ver detalles_escaneo.py
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from detalles_escaneo import details
+    decals, eyes, info = details(V, N, F)
     yb = lambda mm: mm * s + CUFF_BOTTOM
-    decals = dict(logo=decal_grid(-0.13, yb(236), 0.52, 0.16), cuffLogo=decal_grid(-0.18, yb(46), 0.34, 0.10))
     meta = dict(version=1, units='palma', scan=CREDIT, uvScale=uvscale, pivot=0.40, cuffY0=CUFF_BOTTOM, cuffY1=yb(88),
-                counts=dict(v=len(V), f=len(F)), seams=[], decals=decals, eyelets=[], strapRings=[])
+                counts=dict(v=len(V), f=len(F)), seams=[], decals=decals, eyelets=eyes, strapRings=[], design='tempo-1')
     with open(out_prefix + '.bin', 'wb') as fh:
         fh.write(V.tobytes()); fh.write((N * 32767).astype(np.int16).tobytes()); fh.write(uvs.astype(np.float32).tobytes())
         fh.write((A * 255).astype(np.uint8).tobytes())

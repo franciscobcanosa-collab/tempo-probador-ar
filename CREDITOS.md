@@ -6,5 +6,7 @@
   - Por la licencia CC BY-SA 4.0, el modelo adaptado (`models/tempo-scan.*`) se comparte con la misma licencia CC BY-SA 4.0.
   - El escaneo no es un guante de Tempo: se usa como referencia de forma de un guante de box real.
 - **Guante esculpido** (respaldo si no carga el escaneo): `models/tempo-glove.*`, generado con `herramientas/generar_guante.py`.
+- **Diseño Tempo**: emblema (laureles dorados y reloj de arena rojo), colores, tipografías y componentes tomados del UI Kit y de los wireframes del equipo; placa del puño según las fotos de los guantes.
+- **Tipografías**: Archivo, Lato y Cinzel (SIL Open Font License), en `vendor/fonts/`.
 - **MediaPipe Hands** (Google): Apache 2.0. `vendor/mediapipe-hands/`
 - **three.js**: MIT. `vendor/three/`
