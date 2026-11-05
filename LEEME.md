@@ -4,6 +4,8 @@ Web app que abre la cámara, detecta la mano y le pone encima un guante de box 3
 
 ## Cómo probarlo
 
+**Link público:** https://franciscobcanosa-collab.github.io/tempo-probador-ar/ (abrir en el celular y dar permiso a la cámara). Cada cambio que se sube a `main` se publica solo.
+
 La cámara del navegador solo funciona en páginas **https** (o en `localhost`). Por eso no alcanza con abrir el archivo `index.html` con doble clic.
 
 **En el celular (recomendado): publicarlo gratis con https**
