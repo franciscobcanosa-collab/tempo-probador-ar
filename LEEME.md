@@ -59,6 +59,9 @@ Pantallas de error: navegador sin soporte, permiso de cámara denegado, sin cám
   - Grano de cámara, más fuerte con poca luz.
   - Nitidez del render igualada a la del video.
 - **Palma o dorso:** se decide con la curvatura de los dedos en 3D (siempre se doblan hacia la palma) y la etiqueta de mano de MediaPipe, con histéresis. Así el guante no queda al revés aunque la etiqueta falle o la cámara esté espejada.
+- **Sin retraso visible:** la pantalla muestra el mismo cuadro de video que analizó el detector y el guante se dibuja encima en el mismo instante, así no queda atrás de la mano aunque el detector tarde unos milisegundos.
+- **Filtro de movimiento:** One Euro ajustado para movimientos rápidos (en simulación, el retraso medio bajó de 11–17 % a ~3 % del tamaño de la palma, con el mismo temblor en reposo).
+- **Tamaño real:** el guante escaneado mide 29,6 cm; una palma adulta (muñeca a nudillo medio) mide ~10,5 cm, así que el guante se escala a 1,2 veces esa medida por unidad del modelo y la muñeca queda a 9 cm del borde del puño. La medida de la mano usa el largo de la palma o el ancho de los nudillos (el mayor), para que no se achique al inclinar la mano. Las onzas ajustan un poco el tamaño.
 - **Seguimiento:** en cada cuadro se calcula la orientación de la mano (muñeca, nudillos del índice, medio y meñique) y el guante se ubica, rota y escala sobre ella. Un filtro One Euro elimina el temblor sin agregar retraso. La mano izquierda y la derecha se distinguen para poner el pulgar y los cordones del lado correcto.
 - **Orden de carga del guante:** primero el escaneo real procesado (`models/tempo-scan.*`), después el guante esculpido y, si ninguno carga, una versión simple armada por código.
 

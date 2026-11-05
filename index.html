@@ -106,7 +106,8 @@ p{margin:0}
 #stage{position:absolute;inset:0;overflow:hidden;background:#000}
 #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #video.mirror{transform:scaleX(-1)}
-#gl,#dots{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#gl,#dots,#bg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#video.synced{opacity:0}
 .cam-ui{position:absolute;inset:0;display:flex;flex-direction:column;pointer-events:none;
   padding:calc(env(safe-area-inset-top,0px) + 12px) max(12px,env(safe-area-inset-right,0px)) 0 max(12px,env(safe-area-inset-left,0px))}
 .cam-ui > *{pointer-events:auto}
@@ -295,6 +296,7 @@ p{margin:0}
 <section class="screen" id="s-cam" hidden aria-label="Probador con cámara">
   <div id="stage">
     <video id="video" playsinline muted autoplay></video>
+    <canvas id="bg"></canvas>
     <canvas id="dots"></canvas>
     <canvas id="gl"></canvas>
     <div class="guide" id="frame" aria-hidden="true"><span class="scanline"></span></div>
@@ -452,7 +454,10 @@ const CONFIG = {
   cuotas: 3,
   // Guía orientativa de onzas por uso y rango de peso (índices: <55, 55-70, 70-85, >85)
   ozGuide: { sparring:[14,16,16,16], entrenamiento:[10,12,14,16] },
-  ozScale: { 10:0.92, 12:0.96, 14:1.0, 16:1.05 }
+  // Proporción del guante respecto de la mano (escaneo de 29,6 cm de alto; palma adulta ≈ 10,5 cm):
+  // unitsPerPalm = 12,6 / 10,5; la muñeca va a 9 cm del borde del puño (y = 0,21 en el modelo).
+  fit: { unitsPerPalm:1.2, wristY:0.21, widthToLength:1.3 },
+  ozScale: { 10:0.90, 12:0.95, 14:1.0, 16:1.05 }
 };
 const PESOS = ['menos de 55 kg','55 a 70 kg','70 a 85 kg','más de 85 kg'];
 
@@ -632,7 +637,8 @@ $('viewer-ar').onclick = () => go('s-perm');
 $('viewer-buy').onclick = () => openCart();
 
 /* ================= Cámara + detección de manos ================= */
-const video = $('video'), glCanvas = $('gl'), dots = $('dots'), dctx = dots.getContext('2d');
+const video = $('video'), glCanvas = $('gl'), dots = $('dots'), dctx = dots.getContext('2d'), bg = $('bg'), bctx = bg.getContext('2d');
+let synced = false, sizeF = null;
 let stream=null, hands=null, handsReady=null, running=false, busy=false, camRAF=null;
 let renderer3=null, scene3=null, cam3=null, stage=null, glove3=null, glove3Model=null, lightStats=null;
 let view = { w:0, h:0, scale:1, ox:0, oy:0, mirror:false };
@@ -728,7 +734,7 @@ async function startCamera(){
   running = true; loop();
 }
 function stopStream(){ if (stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } }
-function stopCamera(){ running=false; if (camRAF) cancelAnimationFrame(camRAF); camRAF=null; stopStream(); video.srcObject=null; }
+function stopCamera(){ synced=false; video.classList.remove('synced'); bctx.clearRect(0,0,view.w||0,view.h||0); running=false; if (camRAF) cancelAnimationFrame(camRAF); camRAF=null; stopStream(); video.srcObject=null; }
 
 async function setupScene(){
   if (!renderer3){
@@ -758,9 +764,10 @@ function layoutCam(){
   renderer3.setSize(w, h, false);
   cam3.left=0; cam3.right=w; cam3.top=0; cam3.bottom=-h; cam3.updateProjectionMatrix();
   const dpr = Math.min(devicePixelRatio||1,2); dots.width = w*dpr; dots.height = h*dpr; dctx.setTransform(dpr,0,0,dpr,0,0);
+  bg.width = Math.round(w*dpr); bg.height = Math.round(h*dpr); bctx.setTransform(dpr,0,0,dpr,0,0);
 }
 function resetScan(){
-  phase='scan'; seenFrames=0; lastSeen=0; scanStart=performance.now(); smooth=null; filters=null;
+  phase='scan'; seenFrames=0; lastSeen=0; scanStart=performance.now(); smooth=null; filters=null; sizeF=null;
   $('scan-card').hidden=false; $('tryon').hidden=true; $('frame').hidden=false; $('cam-flip').hidden=true; $('cam-help').hidden=false;
   $('size-tag').hidden=true; $('pins').hidden=true; $('zone').hidden=true;
   $('scan-error').hidden=true; $('scan-title').textContent='Mostrá la palma abierta'; $('scan-sub').hidden=false;
@@ -816,9 +823,23 @@ function oneEuro(minCutoff, beta, dCutoff=1.0){
   };
 }
 
+/* Cuadro sincronizado: en lugar del video en vivo se muestra el mismo cuadro que analizó el detector
+   y el guante se dibuja encima en el mismo instante. Así el guante no queda atrás de la mano aunque
+   el detector tarde unos milisegundos por cuadro. */
+function drawSyncedFrame(img){
+  if (!img) return;
+  try {
+    bctx.save();
+    if (view.mirror){ bctx.translate(view.w, 0); bctx.scale(-1, 1); }
+    bctx.drawImage(img, view.ox, view.oy, view.vw*view.scale, view.vh*view.scale);
+    bctx.restore();
+    if (!synced){ synced = true; video.classList.add('synced'); }
+  } catch(_){ }
+}
 function onResults(res){
   if (!running) return;
   const now = performance.now();
+  drawSyncedFrame(res.image);
   dctx.clearRect(0,0,view.w,view.h);
   const lms = res.multiHandLandmarks && res.multiHandLandmarks[0];
   if (!lms){
@@ -828,7 +849,7 @@ function onResults(res){
       seenFrames = Math.max(0, seenFrames-2);
       if (now - scanStart > NOHAND_MS && $('scan-error').hidden) showNoHand();
     } else if (now - lastSeen > LOST_MS){
-      glove3.root.visible = false; stage.updateShadow(null,null,0,false); setStatus('Buscando tu mano…','warn'); filters = null; palmVote = 0; $('pins').hidden = true;
+      glove3.root.visible = false; stage.updateShadow(null,null,0,false); setStatus('Buscando tu mano…','warn'); filters = null; sizeF = null; palmVote = 0; $('pins').hidden = true;
     }
     renderer3.render(scene3, cam3);
     return;
@@ -841,7 +862,7 @@ function onResults(res){
 
   // Suavizado de puntos para evitar temblores
   const pts = lms.map(toScreen);
-  if (!filters) filters = pts.map(() => [0,1,2].map(() => oneEuro(1.4, 0.012)));
+  if (!filters) filters = pts.map(() => [0,1,2].map(() => oneEuro(0.8, 0.08, 1.5)));
   smooth = pts.map((p,i) => p.map((v,k) => filters[i][k](v, now)));
 
   // Distancia: tamaño de la mano respecto de la pantalla
@@ -929,11 +950,19 @@ function updateGlove(p, nIsBack){
   const o = tip.distanceTo(wrist) / palm;                       // ~1.0 puño … ~1.9 mano abierta
   const target = THREE.MathUtils.clamp(0.74 + (o-1.0)/(1.9-1.0)*(1.12-0.74), 0.74, 1.14);
   openK += (target - openK)*0.25; if (!glove3.isGLB) glove3.setOpenness(openK);
-  const s = palm * (CONFIG.ozScale[S.ozTry] || 1);
-  const center = wrist.clone().addScaledVector(up, s*0.75);
+  // Tamaño de la mano: el mayor entre el largo de la palma y el ancho de los nudillos × 1,3 (así no se achica
+  // cuando la mano se inclina) y suavizado aparte para que no "respire".
+  const ref = Math.max(palm, idx.distanceTo(pky) * CONFIG.fit.widthToLength);
+  if (!sizeF) sizeF = oneEuro(0.6, 0.004);
+  const handRef = sizeF(ref, performance.now());
+  // 1 unidad del modelo = 12,6 cm del guante escaneado; palma (muñeca a nudillo medio) ≈ 10,5 cm → 1,2 palmas por unidad
+  const s = handRef * CONFIG.fit.unitsPerPalm * (CONFIG.ozScale[S.ozTry] || 1);
+  const center = wrist.clone().addScaledVector(up, s*(0.67 - CONFIG.fit.wristY));
   stage.updateShadow(center, up, s, true);
+  // la muñeca queda a la altura del borde superior del puño del guante (y = wristY en el modelo)
+  const org = wrist.clone().addScaledVector(up, -s*CONFIG.fit.wristY);
   const m = new THREE.Matrix4().makeBasis(xl.multiplyScalar(s), up.multiplyScalar(s), back.multiplyScalar(s));
-  m.setPosition(wrist.x, wrist.y, wrist.z);
+  m.setPosition(org.x, org.y, org.z);
   glove3.root.matrix.copy(m); glove3.root.matrixWorldNeedsUpdate = true;
   glove3.root.visible = true;
   // pines: 1 en el puño (lado del meñique) y 2 arriba del acolchado (lado del pulgar), en coordenadas del guante
@@ -969,8 +998,8 @@ function takePhoto(){
   const c = document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d');
   g.save();
   if (view.mirror){ g.translate(w,0); g.scale(-1,1); }
-  g.drawImage(video, view.ox*dpr, view.oy*dpr, view.vw*view.scale*dpr, view.vh*view.scale*dpr);
-  g.restore();
+  if (synced){ g.restore(); g.drawImage(bg, 0, 0, w, h); }
+  else { g.drawImage(video, view.ox*dpr, view.oy*dpr, view.vw*view.scale*dpr, view.vh*view.scale*dpr); g.restore(); }
   renderer3.render(scene3, cam3);
   g.drawImage(glCanvas, 0, 0, w, h);
   // Marca como en el UI Kit: TEMPO arriba a la izquierda; modelo y hashtag abajo a la izquierda
