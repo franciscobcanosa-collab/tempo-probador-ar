@@ -48,6 +48,7 @@ p{margin:0;line-height:1.5}
 .btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
 .btn.quiet{background:transparent;color:var(--fg);border:1px solid var(--line);text-transform:none;letter-spacing:0;font-weight:600}
 .link{background:none;border:0;color:var(--fg);text-decoration:underline;text-underline-offset:3px;font-weight:600;padding:10px;align-self:center}
+.credit{font-size:12px;line-height:1.4;color:var(--muted);text-align:center;margin:0}.credit a{color:inherit}
 .footer{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:12px}
 /* intro */
 .hero-glove{height:min(38vh,320px);border-radius:var(--r);background:radial-gradient(ellipse at 50% 35%,#3A2414 0%,#1A1513 55%,#111113 100%);position:relative;overflow:hidden}
@@ -212,6 +213,7 @@ p{margin:0;line-height:1.5}
       <button class="link" id="know-oz">Ya sé mis onzas</button>
       <div class="notice" id="file-notice" hidden><svg><use href="#i-info"/></svg><span>Abriste el archivo directamente: las preguntas funcionan, pero para usar la cámara hay que abrirlo desde un servidor o una dirección https. Mirá el archivo LEEME.</span></div>
       <p class="privacy"><svg><use href="#i-lock"/></svg>No guardamos fotos ni video de tu cámara.</p>
+      <p class="credit" id="scan-credit" hidden></p>
     </div>
   </div>
 </section>
@@ -468,7 +470,9 @@ function drawGlove2D(canvas, colorKey){
 /* El motor 3D se carga aparte: si falla (archivo abierto directamente, sin WebGL o sin la carpeta vendor), el resto de la app sigue andando */
 const ready3D = (async () => {
   if (!HAS_WEBGL) return false;
-  try { G3 = await import('./glove3d.js'); THREE = G3.THREE; await G3.prepare(CONFIG); CAN_3D = true; return true; }
+  try { G3 = await import('./glove3d.js'); THREE = G3.THREE; await G3.prepare(CONFIG); CAN_3D = true;
+    G3.modelInfo().then(c => { if (!c) return; const el = $('scan-credit'); el.innerHTML = `Forma del guante: escaneo 3D real <a href="${c.source}" target="_blank" rel="noopener">“${c.title}”</a>, licencia <a href="${c.licenseUrl}" target="_blank" rel="noopener">${c.license}</a>. Adaptado para el probador.`; el.hidden = false; });
+    return true; }
   catch (e) { console.warn('3D no disponible:', e); return false; }
 })();
 ready3D.then(ok => { if (!ok) return; if (current === 's-intro') hero.start(); if (current === 's-reco') renderModels(); });
@@ -725,12 +729,14 @@ async function setupScene(){
   }
   glove3.setColor(S.color);
   const m = CONFIG.models[S.model];
-  $('to-name').textContent = m.name; $('to-desc').textContent = `${m.desc.split(' · ')[0]} · ${CONFIG.colors[S.color].label} · ${S.ozTry} oz`;
+  // con el escaneo real todos los modelos se ven con abrojo: se aclara para no confundir con el Elite de cordones
+  const cierreTx = () => (glove3.scan && m.cierre === 'cordones') ? 'Cordones (la vista 3D muestra abrojo)' : m.desc.split(' · ')[0];
+  $('to-name').textContent = m.name; $('to-desc').textContent = `${cierreTx()} · ${CONFIG.colors[S.color].label} · ${S.ozTry} oz`;
   $('to-price').textContent = money(m.price);
   $('to-stock').textContent = `En stock · Hasta ${CONFIG.cuotas} cuotas sin interés`;
   renderColorSwatches($('to-colors'), () => {
     glove3.setColor(S.color); $('to-colors-label').textContent = CONFIG.colors[S.color].label;
-    $('to-desc').textContent = `${m.desc.split(' · ')[0]} · ${CONFIG.colors[S.color].label} · ${S.ozTry} oz`;
+    $('to-desc').textContent = `${cierreTx()} · ${CONFIG.colors[S.color].label} · ${S.ozTry} oz`;
     thumbR(S.model, S.color, $('thumb-cam'));
   });
   const oz = document.createElement('span'); oz.className='oz-chip'; oz.textContent = `${S.ozTry} oz`; $('to-colors').appendChild(oz);

@@ -341,7 +341,12 @@ function proceduralGlove(modelKey) {
   root.add(new THREE.Mesh(ringTube(G.Y0 + 0.02, 0.0, 0.05), trim));
   root.add(new THREE.Mesh(loftBand(G.Y0 - 0.03, G.Y0 + 0.4, -0.035, 8), lining));
   const logos = [logo];
-  if (model.cierre === 'cordones') {
+  if (meta.scan) {
+    // escaneo real: el cierre de abrojo y las costuras ya están en la forma; solo se suma el logo de la faja
+    const cl = new THREE.Mesh(gridDecal(meta.decals.cuffLogo, 0.006), mkFoil()); lower.add(cl); logos.push(cl);
+    // el escaneo no es simétrico: el logo va pegado a la malla espejada y se da vuelta la textura para que se lea bien
+    for (const l of logos) { const m = l.material; m.alphaMap = m.alphaMap.clone(); m.normalMap = m.normalMap.clone(); m.alphaMap.needsUpdate = m.normalMap.needsUpdate = true; }
+  } else if (model.cierre === 'cordones') {
     const ys = []; for (let i = 0; i < 6; i++) ys.push(-0.40 + i * 0.12);
     root.add(new THREE.Mesh(curvedDecal(0.15, 0.70, -0.10, -1, 0.002), tongue));
     const eye = (x, y) => { const n = new THREE.Vector3(0, 0, -1), p = new THREE.Vector3(x, y, surfZ(y, x, -1)); const t = new THREE.Mesh(new THREE.TorusGeometry(0.019, 0.0075, 10, 24), metal); t.position.copy(p).addScaledVector(n, 0.004); t.lookAt(p.clone().addScaledVector(n, 1)); root.add(t); return p; };
@@ -387,9 +392,7 @@ function proceduralGlove(modelKey) {
 
 /* ===================== Guante esculpido (malla generada fuera de línea) ===================== */
 let SCULPT = null;
-function loadSculpt() {
-  if (!SCULPT) SCULPT = (async () => {
-    const base = (CFG.sculptPath || 'models/tempo-glove');
+async function fetchMesh(base) {
     const [meta, buf] = await Promise.all([fetch(base + '.json').then(r => { if (!r.ok) throw new Error('json'); return r.json(); }),
                                            fetch(base + '.bin').then(r => { if (!r.ok) throw new Error('bin'); return r.arrayBuffer(); })]);
     const nv = meta.counts.v, nf = meta.counts.f; let o = 0;
@@ -408,9 +411,18 @@ function loadSculpt() {
     g.setIndex(new THREE.BufferAttribute(idx, 1));
     g.computeBoundingSphere();
     return { meta, geo: g };
+}
+// primero el escaneo del guante real (models/tempo-scan); si no está, el guante esculpido
+function loadSculpt() {
+  if (!SCULPT) SCULPT = (async () => {
+    const bases = CFG.sculptPath ? [CFG.sculptPath] : ['models/tempo-scan', 'models/tempo-glove'];
+    let err;
+    for (const b of bases) { try { return await fetchMesh(b); } catch (e) { err = e; } }
+    throw err;
   })();
   return SCULPT;
 }
+export async function modelInfo() { try { return (await loadSculpt()).meta.scan || null; } catch (_) { return null; } }
 const V3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
 function gridDecal(d, lift = 0.008) {
   const pos = [], uv = [], idx = [];
@@ -457,8 +469,13 @@ async function sculptedGlove(modelKey) {
   upper.add(stitchMesh(up, thread)); lower.add(stitchMesh(lo, thread));
   // logos
   const logos = [];
-  const logo = new THREE.Mesh(gridDecal(meta.decals.logo), mkFoil()); upperN.add(logo); logos.push(logo);
-  if (model.cierre === 'cordones') {
+  const logo = new THREE.Mesh(gridDecal(meta.decals.logo, meta.scan ? 0.006 : 0.008), mkFoil()); (meta.scan ? upper : upperN).add(logo); logos.push(logo);
+  if (meta.scan) {
+    // escaneo real: el cierre de abrojo y las costuras ya están en la forma; solo se suma el logo de la faja
+    const cl = new THREE.Mesh(gridDecal(meta.decals.cuffLogo, 0.006), mkFoil()); lower.add(cl); logos.push(cl);
+    // el escaneo no es simétrico: el logo va pegado a la malla espejada y se da vuelta la textura para que se lea bien
+    for (const l of logos) { const m = l.material; m.alphaMap = m.alphaMap.clone(); m.normalMap = m.normalMap.clone(); m.alphaMap.needsUpdate = m.normalMap.needsUpdate = true; }
+  } else if (model.cierre === 'cordones') {
     lower.add(new THREE.Mesh(gridDecal(meta.decals.tongue, 0.003), tongue));
     const eyes = meta.eyelets.map(q => ({ p: V3(q), n: V3(q.slice(3)) }));
     for (const e of eyes) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.019, 0.0075, 10, 24), metal); t.position.copy(e.p).addScaledVector(e.n, 0.004); t.lookAt(e.p.clone().addScaledVector(e.n, 1)); lower.add(t); }
@@ -487,7 +504,7 @@ async function sculptedGlove(modelKey) {
   }
   let lastK = 1;
   return {
-    root, isGLB: false, sculpt: true,
+    root, isGLB: false, sculpt: true, scan: !!meta.scan,
     setColor(key) {
       const c = CFG.colors[key], dark = key === 'negro';
       leather.color.set(c.leather); trim.color.set(c.trim); thread.color.set(c.thread || c.trim); lace.color.set(c.lace); tongue.color.set(c.trim);
@@ -495,7 +512,12 @@ async function sculptedGlove(modelKey) {
       leather.clearcoat = dark ? 0.12 : 0.3; leather.sheen = dark ? 0.2 : 0.25; leather.userData.envMult = dark ? 0.55 : 1; leather.envMapIntensity = ENV_INT * leather.userData.envMult;
       leather.normalScale.set(dark ? 0.6 : 0.45, dark ? 0.6 : 0.45); metal.color.set(dark ? '#8E8A84' : '#C9C4BA');
     },
-    setThumbSide(s) { mirror.scale.x = s >= 0 ? 1 : -1; },
+    setThumbSide(s) {
+      mirror.scale.x = s >= 0 ? 1 : -1;
+      if (meta.scan) for (const l of logos) { const m = l.material, f = s >= 0 ? 1 : -1;
+        for (const t of [m.alphaMap, m.normalMap]) { t.repeat.x = f; t.offset.x = f < 0 ? 1 : 0; t.wrapS = THREE.RepeatWrapping; t.needsUpdate = true; }
+        m.normalScale.x = Math.abs(m.normalScale.x) * f; }
+    },
     setOpenness(k) {                      // el guante esculpido ya tiene forma de puño: solo se estira un poco con la mano abierta
       k = Math.min(1.10, Math.max(0.94, 0.94 + (k - 0.74) * 0.4));
       if (Math.abs(k - lastK) < 0.008) return; lastK = k;

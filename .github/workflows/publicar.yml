@@ -1,0 +1,53 @@
+name: Publicar probador
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # La primera vez descarga el escaneo real del guante (CreativeTools, CC BY-SA 4.0)
+      # desde el dataset público Objaverse y lo convierte al formato del probador.
+      - uses: actions/setup-python@v5
+        if: hashFiles('models/tempo-scan.bin') == ''
+        with:
+          python-version: '3.12'
+      - name: Procesar el escaneo real
+        if: hashFiles('models/tempo-scan.bin') == ''
+        run: |
+          python -m pip install --quiet numpy scipy trimesh fast-simplification xatlas
+          python herramientas/procesar_escaneo.py models/tempo-scan
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add models/tempo-scan.bin models/tempo-scan.json
+          git commit -m "Agregar el modelo procesado del escaneo real [skip ci]"
+          git push
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

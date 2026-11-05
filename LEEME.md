@@ -38,7 +38,7 @@ Pantallas de error: navegador sin soporte, permiso de cámara denegado, sin cám
 ## Cómo funciona
 
 - **Detección de la mano:** MediaPipe Hands (Google) en el navegador. Encuentra 21 puntos de la mano en cada cuadro del video.
-- **Forma del guante:** esculpida como volumen. El puño, la cabeza acolchada de los nudillos, el frente de los dedos doblados, el dorso, la concavidad de la palma, el pulgar y el puño del guante se funden con transiciones suaves. Las costuras de los paneles laterales y de la unión con el puño quedan talladas como surcos. Las proporciones siguen las de un guante de 16 oz: puño de ~13–14 cm de ancho y ~12 cm de profundidad, y puño del guante más angosto. La malla se genera fuera de línea con `herramientas/generar_guante.py` y se guarda en `models/tempo-glove.bin` + `.json` (~2 MB, 70.000 triángulos, con textura desplegada y sombreado de pliegues incorporado).
+- **Forma del guante:** sale de un **escaneo 3D de un guante de box real** ("Boxing Glove 3D-scan by CreativeTools", licencia CC BY-SA 4.0, ver `CREDITOS.md`). `herramientas/procesar_escaneo.py` lo descarga, une las piezas, lo simplifica a 60.000 triángulos, lo orienta y escala a la mano, le calcula la textura desplegada y el sombreado de los pliegues, y lo guarda en `models/tempo-scan.bin` + `.json`. Al publicar en GitHub esto lo hace solo la acción `.github/workflows/publicar.yml`. Si el escaneo no está, se usa el guante esculpido de respaldo: forma esculpida como volumen. El puño, la cabeza acolchada de los nudillos, el frente de los dedos doblados, el dorso, la concavidad de la palma, el pulgar y el puño del guante se funden con transiciones suaves. Las costuras de los paneles laterales y de la unión con el puño quedan talladas como surcos. Las proporciones siguen las de un guante de 16 oz: puño de ~13–14 cm de ancho y ~12 cm de profundidad, y puño del guante más angosto. La malla se genera fuera de línea con `herramientas/generar_guante.py` y se guarda en `models/tempo-glove.bin` + `.json` (~2 MB, 70.000 triángulos, con textura desplegada y sombreado de pliegues incorporado).
 - **Materiales y detalles (`glove3d.js`):** Three.js con materiales físicos:
   - Cuero con grano generado por código: relieve del poro, rugosidad variable y sombreado en los surcos.
   - Barniz suave y brillo de cuero, más oscuro y mate en el negro.
@@ -52,7 +52,7 @@ Pantallas de error: navegador sin soporte, permiso de cámara denegado, sin cám
   - Grano de cámara, más fuerte con poca luz.
   - Nitidez del render igualada a la del video.
 - **Seguimiento:** en cada cuadro se calcula la orientación de la mano (muñeca, nudillos del índice, medio y meñique) y el guante se ubica, rota y escala sobre ella. Un filtro One Euro elimina el temblor sin agregar retraso. La mano izquierda y la derecha se distinguen para poner el pulgar y los cordones del lado correcto.
-- **Orden de carga del guante:** primero un escaneo real si existe (`models/*.glb`, ver `models/LEEME.md`), después el guante esculpido y, si ninguno carga, una versión simple armada por código.
+- **Orden de carga del guante:** primero el escaneo real procesado (`models/tempo-scan.*`), después el guante esculpido y, si ninguno carga, una versión simple armada por código.
 
 ## Cómo cambiar la forma del guante
 
@@ -78,13 +78,14 @@ Al principio del script de `index.html` está el objeto `CONFIG`:
 
 ## Limitaciones
 
-- El guante generado por código es realista, pero no es una copia exacta del producto. Para que sea indistinguible de un guante real hace falta escanear el guante de Tempo y cargarlo como .glb (ver `models/LEEME.md`).
-- El guante rígido escaneado no se acorta al cerrar el puño, como sí lo hace el generado por código.
+- La forma es la de un guante real escaneado, pero no es el guante de Tempo: tiene cierre de abrojo, así que el Elite (de cordones) se ve con abrojo y la pantalla lo aclara. Para que sea el producto exacto hay que escanear el guante de Tempo y procesarlo con el mismo script.
+- El guante escaneado ya tiene forma de puño: con la mano abierta solo se estira un poco.
 - El tamaño por onzas es aproximado.
 - La detección necesita buena luz y la mano entera dentro de la pantalla. La profundidad se estima desde una sola cámara, así que con la mano muy de costado el guante puede desacomodarse.
 - Se probó en Chromium con una cámara simulada. Falta probarlo en celulares reales.
 
 ## Licencias
 
+- Escaneo del guante: CreativeTools, CC BY-SA 4.0 (ver `CREDITOS.md`).
 - MediaPipe Hands: Apache 2.0 (Google), en `vendor/mediapipe-hands/`.
 - three.js: MIT, en `vendor/three/`.
