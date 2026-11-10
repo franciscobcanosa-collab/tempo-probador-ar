@@ -172,6 +172,8 @@ p{margin:0}
 .hand-anim{width:84px;height:84px;margin:0 auto;color:var(--accent)}
 .hand-anim .open{animation:open 2.4s infinite} .hand-anim .fist{animation:fist 2.4s infinite}
 @keyframes open{0%,45%{opacity:1}55%,100%{opacity:0}} @keyframes fist{0%,45%{opacity:0}55%,100%{opacity:1}}
+.qr-box{background:#fff;border-radius:16px;padding:14px;width:min(64vw,260px);aspect-ratio:1;display:grid;place-items:center;box-shadow:0 0 0 1.5px var(--accent-soft)}
+.qr-box svg{width:100%;height:100%;display:block}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);background:var(--control);border:1.5px solid var(--line);padding:12px 16px;border-radius:12px;font-size:14px;z-index:30;max-width:90vw}
 .loading{display:flex;flex-direction:column;align-items:center;gap:14px;justify-content:center;flex:1;text-align:center}
 .spin{width:40px;height:40px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp 0.9s linear infinite}
@@ -200,6 +202,7 @@ p{margin:0}
   <symbol id="i-help" viewBox="0 0 24 24"><path d="M9.2 9.2a2.9 2.9 0 115.1 1.9c-1 .9-2.3 1.5-2.3 3.2M12 18h.01" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v6M12 7.5h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="i-cart" viewBox="0 0 24 24"><path d="M3 4h2l2.2 10.2a1.5 1.5 0 001.5 1.2h8.6a1.5 1.5 0 001.5-1.1L21 8H6.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.5" cy="19.5" r="1.3" fill="currentColor"/><circle cx="17" cy="19.5" r="1.3" fill="currentColor"/></symbol>
 </svg>
 
@@ -285,9 +288,11 @@ p{margin:0}
       <h2 id="t-perm">Necesitamos tu cámara</h2>
       <p class="body2" id="perm-text">Usamos la cámara solo para detectar tu mano y mostrarte el guante encima, en tiempo real. Todo pasa en tu celular.</p>
       <div class="card privacy-card"><svg><use href="#i-lock"/></svg>No grabamos ni guardamos imágenes.</div>
+      <div class="notice" id="handoff-notice" hidden style="text-align:left"><svg><use href="#i-phone"/></svg><span id="handoff-tx"></span></div>
     </div>
     <div class="footer">
       <button class="btn" id="perm-yes">Permitir cámara</button>
+      <button class="btn sec" id="perm-qr" hidden><svg><use href="#i-phone"/></svg>Seguir en el celular</button>
       <button class="link u" id="perm-no">Ahora no</button>
     </div>
   </div>
@@ -409,6 +414,21 @@ p{margin:0}
   </div>
 </section>
 
+<!-- Seguir en el celular: QR -->
+<div class="overlay" id="qr" hidden role="dialog" aria-modal="true" aria-labelledby="t-qr">
+  <div class="sheet" style="border-radius:28px 28px 0 0;text-align:center;align-items:center">
+    <div class="eyebrow">Seguí en tu celular</div>
+    <h2 id="t-qr">Escaneá el código</h2>
+    <p class="body2" id="qr-tx" style="max-width:360px">Abrí la cámara del celular y apuntá al código. Se abre el probador con tu guante, listo para usar la cámara.</p>
+    <div class="qr-box" id="qr-box" role="img" aria-label="Código QR para abrir el probador en el celular"></div>
+    <p class="muted" style="word-break:break-all;max-width:360px" id="qr-url"></p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:400px">
+      <button class="btn sec m" id="qr-copy">Copiar link</button>
+      <button class="btn m" id="qr-close">Listo</button>
+    </div>
+  </div>
+</div>
+
 <!-- Ayuda -->
 <div class="overlay" id="help" hidden role="dialog" aria-modal="true" aria-labelledby="t-help">
   <div class="sheet" style="border-radius:28px 28px 0 0">
@@ -430,6 +450,7 @@ p{margin:0}
 <div class="toast" id="toast" hidden role="status"></div>
 
 <script type="importmap">{"imports":{"three":"./vendor/three/three.module.min.js","three/addons/":"./vendor/three/addons/"}}</script>
+<script src="vendor/qrcode/qrcode.js"></script>
 <script src="vendor/mediapipe-hands/hands.js"></script>
 <script>
 "use strict";
@@ -460,6 +481,8 @@ const CONFIG = {
   // unitsPerPalm = 12,6 / 10,5; la muñeca va a 9 cm del borde del puño (y = 0,21 en el modelo).
   fit: { unitsPerPalm:1.2, wristY:0.21, widthToLength:1.3 },
   // Tapar con el fondo difuminado lo que asoma de la mano real alrededor del guante
+  // Dirección pública del probador (para el QR cuando se abre desde la compu en local)
+  publicUrl: 'https://franciscobcanosa-collab.github.io/tempo-probador-ar/',
   eraseHand: true,
   // Desenfoque del guante cuando la mano se mueve rápido (como sale la imagen real)
   motionBlur: true,
@@ -618,6 +641,48 @@ function updateOzNotice(){
 }
 $('reco-next').onclick = () => { $('perm-text').textContent = `Usamos la cámara solo para detectar tu mano y mostrarte el ${CONFIG.models[S.model].name} encima, en tiempo real. Todo pasa en tu celular.`; go('s-perm'); };
 $('perm-no').onclick = () => go('s-viewer');
+
+/* ================= Seguir en el celular (QR) =================
+   En la compu, además de usar la webcam, se puede escanear un QR: el celular abre el probador con el mismo
+   modelo, color y onzas, directo en el paso de la cámara. */
+function handoffUrl(){
+  const pub = /^https:$/.test(location.protocol) && !/^(localhost|127\.|\[::1\])/.test(location.hostname);
+  const base = pub ? location.origin + location.pathname : CONFIG.publicUrl;
+  const q = new URLSearchParams({ paso:'camara', m:S.model, c:S.color, oz:String(S.ozTry), r:String(S.ozRec) });
+  if (S.knowOz) q.set('k','1'); else { if (S.uso) q.set('u', S.uso); if (S.peso!=null) q.set('p', String(S.peso)); }
+  return base + '?' + q.toString();
+}
+function showQR(){
+  const url = handoffUrl(), m = CONFIG.models[S.model];
+  try {
+    const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+    $('qr-box').innerHTML = qr.createSvgTag({ cellSize:4, margin:2, scalable:true });
+  } catch(e){ $('qr-box').textContent = 'No se pudo generar el código.'; }
+  $('qr-tx').textContent = `Abrí la cámara del celular y apuntá al código. Se abre el probador con el ${m.name} · ${CONFIG.colors[S.color].label} · ${S.ozTry} Oz, listo para usar la cámara.`;
+  $('qr-url').textContent = url; $('qr').hidden = false; $('qr-close').focus();
+}
+$('perm-qr').hidden = isTouch;                      // en el celular no hace falta
+$('perm-qr').onclick = showQR;
+$('qr-close').onclick = () => $('qr').hidden = true;
+$('qr').addEventListener('click', e => { if (e.target.id === 'qr') $('qr').hidden = true; });
+$('qr-copy').onclick = async () => { try { await navigator.clipboard.writeText(handoffUrl()); toast('Link copiado.'); } catch(_){ toast('No se pudo copiar: copiá el link que está debajo del código.'); } };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('qr').hidden) $('qr').hidden = true; });
+// Al abrir el link del QR: recuperar la elección y pasar al permiso de cámara
+function resumeFromLink(){
+  const q = new URLSearchParams(location.search);
+  if (q.get('paso') !== 'camara' || !CONFIG.models[q.get('m')]) return;
+  S.model = q.get('m'); if (CONFIG.colors[q.get('c')]) S.color = q.get('c');
+  const oz = +q.get('oz'), r = +q.get('r');
+  if (q.get('k') === '1' || !CONFIG.ozGuide[q.get('u')]) { S.knowOz = true; S.ozRec = 16; }
+  else { S.knowOz = false; S.uso = q.get('u'); S.peso = Math.min(3, Math.max(0, +q.get('p') || 0)); computeReco(); S.model = q.get('m'); }
+  if (CONFIG.ozScale[r]) S.ozRec = r;
+  renderReco(); if (availableOz(S.model).includes(oz)) S.ozTry = oz;
+  const m = CONFIG.models[S.model];
+  $('perm-text').textContent = `Usamos la cámara solo para detectar tu mano y mostrarte el ${m.name} encima, en tiempo real. Todo pasa en tu celular.`;
+  $('handoff-tx').textContent = `Seguís desde la compu: ${m.name} · ${CONFIG.colors[S.color].label} · ${S.ozTry} Oz.`; $('handoff-notice').hidden = false;
+  history.replaceState(null, '', location.pathname);
+  go('s-perm');
+}
 $('perm-yes').onclick = () => startCamera();
 
 /* ================= Visor 3D ================= */
@@ -719,7 +784,7 @@ async function startCamera(){
     }
     if (n === 'NotFoundError' || n === 'OverconstrainedError'){
       return showError({ title:'No encontramos una cámara', text:'Este dispositivo no tiene una cámara disponible o la está usando otra app.',
-        steps:['Cerrá otras apps que estén usando la cámara.','Probá desde el celular.'], actions:[['Reintentar', startCamera], VIEW3D] });
+        steps:['Cerrá otras apps que estén usando la cámara.','Seguí desde el celular con el código QR.'], actions:[['Seguir en el celular', () => { go('s-perm'); showQR(); }], ['Reintentar', startCamera, 'sec'], VIEW3D] });
     }
     return showError({ title:'No pudimos abrir la cámara', text:'Algo falló al iniciar la cámara.', steps:['Cerrá otras apps que usen la cámara y volvé a intentar.'], actions:[['Reintentar', startCamera], VIEW3D] });
   }
@@ -1244,6 +1309,7 @@ $('cart-checkout').onclick = () => toast('Este prototipo no procesa compras: en 
 document.addEventListener('visibilitychange', () => { if (document.hidden && current==='s-cam') { stopCamera(); _go('s-perm'); current='s-perm'; } });
 
 go('s-intro');
+resumeFromLink();
 // Precarga del detector mientras el usuario responde las preguntas
 setTimeout(() => { initHands().catch(()=>{}); }, 1200);
 </script>

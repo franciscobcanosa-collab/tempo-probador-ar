@@ -29,7 +29,7 @@ y abrís `http://localhost:8000` en Chrome. Usa la webcam.
 
 1. **Tus onzas:** dos preguntas (uso y peso). No hay respuestas preseleccionadas, y el botón "Siguiente" se activa recién cuando elegís.
 2. **Tu guante:** recomienda las onzas y muestra Elite, Pro y Fit con precio y stock. Si las onzas recomendadas no están en stock, lo avisa.
-3. **Permiso de cámara:** explica para qué se usa. "Ahora no" lleva al visor 3D sin cámara.
+3. **Permiso de cámara:** explica para qué se usa. En la compu, además de usar la webcam, se puede tocar **"Seguir en el celular"**: aparece un código QR que abre el probador en el celular con el mismo modelo, color y onzas, directo en este paso. "Ahora no" lleva al visor 3D sin cámara.
 4. **Escaneo:** muestra los 21 puntos de la mano y el estado de la luz, la distancia y los puntos detectados.
 5. **Guante puesto:** el guante sigue la mano, cambia de color (blanco o negro), tiene foto con temporizador de 3 segundos, botón de ayuda y la opción de ocultar los controles.
 6. **Foto:** la guarda con la marca Tempo y se puede compartir si el celular lo permite.
@@ -107,4 +107,5 @@ Al principio del script de `index.html` está el objeto `CONFIG`:
 
 - Escaneo del guante: CreativeTools, CC BY-SA 4.0 (ver `CREDITOS.md`).
 - MediaPipe Hands: Apache 2.0 (Google), en `vendor/mediapipe-hands/`.
+- QR Code Generator (Kazuhiko Arase): MIT, en `vendor/qrcode/`.
 - three.js: MIT, en `vendor/three/`.

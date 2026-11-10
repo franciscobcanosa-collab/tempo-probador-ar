@@ -9,4 +9,5 @@
 - **Diseño Tempo**: emblema (laureles dorados y reloj de arena rojo), colores, tipografías y componentes tomados del UI Kit y de los wireframes del equipo; placa del puño según las fotos de los guantes.
 - **Tipografías**: Archivo, Lato y Cinzel (SIL Open Font License), en `vendor/fonts/`.
 - **MediaPipe Hands** (Google): Apache 2.0. `vendor/mediapipe-hands/`
+- **QR Code Generator** (Kazuhiko Arase): MIT. `vendor/qrcode/`
 - **three.js**: MIT. `vendor/three/`
