@@ -810,7 +810,7 @@ async function startCamera(){
   running = true; loop();
 }
 function stopStream(){ if (stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } }
-function stopCamera(){ TR.alpha = 0; TR.q = null; TR.prevRaw = null; TR.side = 0; if (G3) G3.setBend(new THREE.Quaternion()); if (stage) stage.expoMul = 1; FA.ang = 0; WZ.ok = false; mb = { x:0, y:0, t:0, vx:0, vy:0 }; synced=false; video.classList.remove('synced'); bctx.clearRect(0,0,view.w||0,view.h||0); running=false; if (camRAF) cancelAnimationFrame(camRAF); camRAF=null; stopStream(); video.srcObject=null; }
+function stopCamera(){ TR.alpha = 0; TR.q = null; TR.prevRaw = null; TR.side = 0; TR.votes = 0; TR.size = 0; TR.acr = null; TR.wmax = 0; TR.azs = 0; if (G3) G3.setBend(new THREE.Quaternion()); if (stage) stage.expoMul = 1; FA.ang = 0; WZ.ok = false; mb = { x:0, y:0, t:0, vx:0, vy:0 }; synced=false; video.classList.remove('synced'); bctx.clearRect(0,0,view.w||0,view.h||0); running=false; if (camRAF) cancelAnimationFrame(camRAF); camRAF=null; stopStream(); video.srcObject=null; }
 
 async function setupScene(){
   if (!renderer3){
@@ -1056,7 +1056,7 @@ function onResults(res){
       if (now - scanStart > NOHAND_MS && $('scan-error').hidden) showNoHand();
     } else if (now - lastSeen > LOST_MS){
       glove3.root.visible = false; stage.updateShadow(null,null,0,false); setStatus('Buscando tu mano…','warn'); filters = null; sizeF = null; palmVote = 0; $('pins').hidden = true; WZ.ok = false; FA.ang = 0;
-      TR.alpha = 0; TR.q = null; TR.prevRaw = null; TR.side = 0;
+      TR.alpha = 0; TR.q = null; TR.prevRaw = null; TR.side = 0; TR.votes = 0; TR.size = 0; TR.acr = null; TR.wmax = 0; TR.azs = 0;
     } else {
       // pérdida breve: el guante queda donde estaba y recién después de HOLD_MS se desvanece
       const lost = now - lastSeen;
@@ -1177,11 +1177,14 @@ function palmSide(res, rightOnScreen){
       vote += THREE.MathUtils.clamp(-c / 1.2, -1, 1);
     }
   }
-  palmVote = THREE.MathUtils.clamp(palmVote*0.8 + vote*0.2, -1, 1);
-  // histéresis: solo cambia de lado cuando la evidencia es clara (evita que el guante "gire" de golpe y vuelva)
+  // Este signo depende solo de si en pantalla es una mano izquierda o derecha (no de si se ve la palma o el dorso),
+  // así que es fijo mientras se use la misma mano: se decide con los primeros cuadros y solo cambia si la evidencia
+  // contraria se sostiene ~1 s (por ejemplo, si se cambia de mano).
+  TR.votes = (TR.votes || 0) + 1;
+  palmVote = THREE.MathUtils.clamp(palmVote*(TR.votes < 8 ? 0.6 : 0.95) + vote*(TR.votes < 8 ? 0.4 : 0.05), -1, 1);
   if (!TR.side) TR.side = palmVote >= 0 ? 1 : -1;
-  else if (TR.side > 0 && palmVote < -0.3) TR.side = -1;
-  else if (TR.side < 0 && palmVote > 0.3) TR.side = 1;
+  else if (TR.votes > 8 && TR.side > 0 && palmVote < -0.55) TR.side = -1;
+  else if (TR.votes > 8 && TR.side < 0 && palmVote > 0.55) TR.side = 1;
   return TR.side;
 }
 function updateGlove(p, nIsBack, wl, now){
@@ -1189,42 +1192,72 @@ function updateGlove(p, nIsBack, wl, now){
   const upv = new THREE.Vector3().subVectors(mid, wrist);
   const palm2 = Math.hypot(upv.x, upv.y); if (palm2 < 8) return;
   const acr = new THREE.Vector3().subVectors(idx, pky), acr2 = Math.hypot(acr.x, acr.y) || 1;
-  // Orientación 3D: la dirección en la imagen sale de los puntos de pantalla (precisos) y la inclinación hacia la
-  // cámara de las coordenadas 3D del detector (los puntos de pantalla achatan la profundidad)
-  let uz = upv.z / Math.max(1e-6, upv.length()), az = acr.z / Math.max(1e-6, acr.length());
+  // Orientación robusta para giros de muñeca:
+  //  · eje largo (muñeca → nudillos): dirección en la imagen de los puntos de pantalla; la inclinación hacia la
+  //    cámara se limita a ±25° y se suaviza mucho (con el puño cerrado la profundidad del detector es muy ruidosa
+  //    y hacía que el guante "apunte" a la cámara)
+  //  · giro alrededor de ese eje (pronación): con el vector entre nudillos en 3D del detector, que es estable
+  //  · la mano (izquierda o derecha en pantalla) queda fija en la sesión: el guante gira de forma continua
+  //    con la muñeca en lugar de saltar entre palma y dorso
+  const up2x = upv.x/palm2, up2y = upv.y/palm2;
+  // giro de la muñeca: cuánto gira sale de cuánto se acorta en la imagen el ancho de los nudillos (preciso);
+  // la profundidad del detector (ruidosa) solo dice hacia qué lado, y se suaviza
+  const dtW = TR.wT ? Math.min(0.2, (now - TR.wT)/1000) : 0; TR.wT = now;
+  TR.wmax = Math.max(acr2, (TR.wmax || acr2) * (1 - 0.04*dtW), palm2*0.62);
+  const foreshort = Math.min(1, acr2 / TR.wmax);
+  let azSign = TR.azs || 0;
   if (wl){
     const Wp = (i) => new THREE.Vector3(view.mirror ? -wl[i].x : wl[i].x, -wl[i].y, -wl[i].z);
-    const uw = Wp(9).sub(Wp(0)).normalize(), aw = Wp(5).sub(Wp(17)).normalize();
-    if (!WZ.ok){ WZ.u = uw.z; WZ.a = aw.z; WZ.ok = true; } else { WZ.u += (uw.z - WZ.u)*0.45; WZ.a += (aw.z - WZ.a)*0.45; }
-    uz = WZ.u; az = WZ.a;
-  }
-  uz = THREE.MathUtils.clamp(uz, -0.9, 0.9); az = THREE.MathUtils.clamp(az, -0.9, 0.9);
-  const ru = Math.sqrt(1 - uz*uz), ra = Math.sqrt(1 - az*az);
-  const up = new THREE.Vector3(upv.x/palm2*ru, upv.y/palm2*ru, uz).normalize();
-  const across = new THREE.Vector3(acr.x/acr2*ra, acr.y/acr2*ra, az); across.addScaledVector(up, -across.dot(up)).normalize();
+    const uw = Wp(9).sub(Wp(0)).normalize();
+    // normal de la palma con varios puntos (menos ruido que dos): suma de productos cruz en abanico desde la muñeca
+    const P0 = Wp(0), ring = [5,9,13,17].map(Wp), nW = new THREE.Vector3();
+    for (let i=0;i<3;i++) nW.add(new THREE.Vector3().crossVectors(ring[i].clone().sub(P0), ring[i+1].clone().sub(P0)));
+    const awz = Wp(5).sub(Wp(17)).normalize().z;
+    TR.azs = (TR.azs || 0) + (THREE.MathUtils.clamp(awz*4, -1, 1) - (TR.azs || 0)) * 0.25; azSign = TR.azs;
+    const uzT = THREE.MathUtils.clamp(uw.z, -0.42, 0.42);
+    if (!WZ.ok){ WZ.u = uzT; WZ.ok = true; } else WZ.u += (uzT - WZ.u)*0.12;
+  } else WZ.u *= 0.9;
+  const ru = Math.sqrt(1 - WZ.u*WZ.u);
+  const up = new THREE.Vector3(up2x*ru, up2y*ru, WZ.u).normalize();
+  const azMag = Math.sqrt(Math.max(0, 1 - foreshort*foreshort)), az = azMag * THREE.MathUtils.clamp(azSign*1.5, -1, 1);
+  const raz = Math.sqrt(Math.max(0, 1 - az*az));
+  const across = new THREE.Vector3(acr.x/acr2*raz, acr.y/acr2*raz, az); across.addScaledVector(up, -across.dot(up));
+  if (across.lengthSq() < 1e-6) across.set(-up.y, up.x, 0);
+  across.normalize();
+  if (TR.acr){ across.lerp(TR.acr, 0.3).addScaledVector(up, -across.dot(up)).normalize(); }
+  TR.acr = across.clone();
   const n = new THREE.Vector3().crossVectors(across, up).normalize();
   const back = nIsBack > 0 ? n.clone() : n.clone().negate();
   let xl = new THREE.Vector3().crossVectors(up, back).normalize();
   const thumbSign = Math.sign(across.dot(xl)) || 1;
-  // rotación suavizada: sigue rápido los giros grandes y filtra el temblor de los chicos; si cambió palma/dorso, salta
+  // rotación suavizada: sigue rápido los giros grandes y filtra el temblor de los chicos
   const qT = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xl, up, back));
   if (!TR.q || TR.lastSide !== nIsBack) TR.q = qT.clone();
-  else { const a = TR.q.angleTo(qT); TR.q.slerp(qT, THREE.MathUtils.clamp(0.42 + a*1.4, 0.42, 1)); }
+  else {
+    // velocidad de giro limitada a lo que puede hacer una muñeca real (~700°/s): un error de medición no se convierte en salto
+    const a = TR.q.angleTo(qT), dtq = TR.qT ? Math.min(0.1, Math.max(0.016, (now - TR.qT)/1000)) : 0.033;
+    const next = TR.q.clone().slerp(qT, THREE.MathUtils.clamp(0.38 + a*1.2, 0.38, 0.9)), maxStep = 12.2 * dtq;
+    if (TR.q.angleTo(next) > maxStep) TR.q.rotateTowards(qT, maxStep); else TR.q.copy(next);
+  }
+  TR.qT = now;
   TR.lastSide = nIsBack;
   const RM = new THREE.Matrix4().makeRotationFromQuaternion(TR.q);
   xl = new THREE.Vector3().setFromMatrixColumn(RM, 0); up.setFromMatrixColumn(RM, 1); back.setFromMatrixColumn(RM, 2);
   glove3.setThumbSide(thumbSign);
   window.__ar = { nIsBack, palmVote:+palmVote.toFixed(2), thumbSign, back:[+back.x.toFixed(2),+back.y.toFixed(2),+back.z.toFixed(2)], forearm:+(FA.ang*180/Math.PI).toFixed(1), faConf:+FA.conf.toFixed(2) };   // diagnóstico (pruebas)
   // Se amolda: el cuerpo del guante se acorta al cerrar el puño
-  const palm = palm2 / Math.max(0.45, ru);                       // largo real de la palma (sin el escorzo)
   const o = tip.distanceTo(wrist) / Math.max(1, upv.length());   // ~1.0 puño … ~1.9 mano abierta
   const target = THREE.MathUtils.clamp(0.74 + (o-1.0)/(1.9-1.0)*(1.12-0.74), 0.74, 1.14);
   openK += (target - openK)*0.25; if (!glove3.isGLB) glove3.setOpenness(openK);
-  // Tamaño de la mano: el mayor entre el largo de la palma y el ancho de los nudillos × 1,3, los dos corregidos por la
-  // inclinación, y suavizado aparte para que no "respire".
-  const ref = Math.max(palm, acr2 / Math.max(0.45, ra) * CONFIG.fit.widthToLength);
-  if (!sizeF) sizeF = oneEuro(0.6, 0.004);
-  const handRef = sizeF(ref, performance.now());
+  // Tamaño de la mano: el mayor entre el largo de la palma y el ancho de los nudillos × 1,3 (en la imagen). Al girar
+  // la muñeca una de las dos medidas se acorta por perspectiva, así que el tamaño solo puede bajar despacio
+  // (10 %/s) y subir un poco más rápido (35 %/s): la distancia real a la cámara cambia mucho más lento que el giro.
+  const ref = Math.max(palm2, acr2 * CONFIG.fit.widthToLength);
+  const dtS = TR.sizeT ? Math.min(0.2, (now - TR.sizeT)/1000) : 0; TR.sizeT = now;
+  if (!TR.size) TR.size = ref;
+  else TR.size = THREE.MathUtils.clamp(ref, TR.size*(1 - 0.10*dtS), TR.size*(1 + 0.35*dtS));
+  if (!sizeF) sizeF = oneEuro(0.5, 0.002);
+  const handRef = sizeF(TR.size, now);
   // 1 unidad del modelo = 12,6 cm del guante escaneado; palma (muñeca a nudillo medio) ≈ 10,5 cm → 1,2 palmas por unidad
   const s = handRef * CONFIG.fit.unitsPerPalm * (CONFIG.ozScale[S.ozTry] || 1);
   const center = wrist.clone().addScaledVector(up, s*(0.67 - CONFIG.fit.wristY));
