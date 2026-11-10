@@ -715,7 +715,12 @@ let renderer3=null, scene3=null, cam3=null, stage=null, glove3=null, glove3Model
 let view = { w:0, h:0, scale:1, ox:0, oy:0, mirror:false };
 let phase = 'scan';            // 'scan' | 'on'
 let seenFrames=0, lastSeen=0, scanStart=0, smooth=null, openK=0.9, lightLevel=null;
-const LOST_MS = 600, NOHAND_MS = 8000;
+const LOST_MS = 1500, NOHAND_MS = 8000;
+/* Estabilidad del guante: si el detector pierde la mano un instante, el guante se mantiene en su lugar
+   (y se desvanece suave si la pérdida sigue) en vez de desaparecer y reaparecer de golpe; los cuadros con un
+   salto imposible se descartan; la orientación se suaviza y palma/dorso tiene histéresis. */
+const HOLD_MS = 650, FADE_MS = 300;
+const TR = { alpha:0, q:null, prevRaw:null, glitch:0, side:0 };
 
 function setStatus(text, kind){ $('status-tx').textContent = text; const c=$('status-chip'); c.className = 'pill' + (kind==='ok'?' ok':kind==='err'?' err':''); }
 
@@ -724,7 +729,7 @@ function initHands(){
   handsReady = (async () => {
     if (typeof Hands === 'undefined') throw new Error('hands-js');
     hands = new Hands({ locateFile: (f) => 'vendor/mediapipe-hands/' + f });
-    hands.setOptions({ maxNumHands:1, modelComplexity: isTouch ? 0 : 1, minDetectionConfidence:0.6, minTrackingConfidence:0.5, selfieMode:false });
+    hands.setOptions({ maxNumHands:1, modelComplexity: isTouch ? 0 : 1, minDetectionConfidence:0.5, minTrackingConfidence:0.3, selfieMode:false });
     hands.onResults(onResults);
     await Promise.race([ hands.initialize(), new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 30000)) ]);
     return hands;
@@ -805,7 +810,7 @@ async function startCamera(){
   running = true; loop();
 }
 function stopStream(){ if (stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } }
-function stopCamera(){ if (G3) G3.setBend(new THREE.Quaternion()); if (stage) stage.expoMul = 1; FA.ang = 0; WZ.ok = false; mb = { x:0, y:0, t:0, vx:0, vy:0 }; synced=false; video.classList.remove('synced'); bctx.clearRect(0,0,view.w||0,view.h||0); running=false; if (camRAF) cancelAnimationFrame(camRAF); camRAF=null; stopStream(); video.srcObject=null; }
+function stopCamera(){ TR.alpha = 0; TR.q = null; TR.prevRaw = null; TR.side = 0; if (G3) G3.setBend(new THREE.Quaternion()); if (stage) stage.expoMul = 1; FA.ang = 0; WZ.ok = false; mb = { x:0, y:0, t:0, vx:0, vy:0 }; synced=false; video.classList.remove('synced'); bctx.clearRect(0,0,view.w||0,view.h||0); running=false; if (camRAF) cancelAnimationFrame(camRAF); camRAF=null; stopStream(); video.srcObject=null; }
 
 async function setupScene(){
   if (!renderer3){
@@ -1051,10 +1056,26 @@ function onResults(res){
       if (now - scanStart > NOHAND_MS && $('scan-error').hidden) showNoHand();
     } else if (now - lastSeen > LOST_MS){
       glove3.root.visible = false; stage.updateShadow(null,null,0,false); setStatus('Buscando tu mano…','warn'); filters = null; sizeF = null; palmVote = 0; $('pins').hidden = true; WZ.ok = false; FA.ang = 0;
+      TR.alpha = 0; TR.q = null; TR.prevRaw = null; TR.side = 0;
+    } else {
+      // pérdida breve: el guante queda donde estaba y recién después de HOLD_MS se desvanece
+      const lost = now - lastSeen;
+      TR.alpha = lost < HOLD_MS ? TR.alpha : Math.max(0, 1 - (lost - HOLD_MS) / FADE_MS);
+      $('pins').hidden = TR.alpha < 0.5;
     }
     renderer3.render(scene3, cam3); composeGlove(now);
     return;
   }
+  // salto imposible de un cuadro al siguiente (detección equivocada): se ignora hasta 2 cuadros seguidos
+  if (phase==='on' && TR.prevRaw){
+    const r0 = toScreen(lms[0]), r9 = toScreen(lms[9]), pl = Math.hypot(r9[0]-r0[0], r9[1]-r0[1]) || 1;
+    const prevPl = Math.hypot(TR.prevRaw[9][0]-TR.prevRaw[0][0], TR.prevRaw[9][1]-TR.prevRaw[0][1]) || 1;
+    const jump = Math.hypot(r0[0]-TR.prevRaw[0][0], r0[1]-TR.prevRaw[0][1]) / prevPl, ratio = pl/prevPl;
+    if ((jump > 2.2 || ratio > 1.8 || ratio < 0.55) && now - lastSeen < 150 && TR.glitch < 2){
+      TR.glitch++; renderer3.render(scene3, cam3); composeGlove(now); return;
+    }
+  }
+  TR.glitch = 0;
   lastSeen = now;
   const label = res.multiHandedness && res.multiHandedness[0] ? res.multiHandedness[0].label : 'Right';
   // Con imágenes sin espejar, MediaPipe invierte la etiqueta. Si mostramos espejado, la mano en pantalla cambia de lado.
@@ -1086,6 +1107,8 @@ function onResults(res){
     if (seenFrames >= 18) placeGlove();
   }
   if (phase==='on') {
+    TR.prevRaw = pts;
+    TR.alpha = Math.min(1, TR.alpha + 0.34);           // al volver a encontrar la mano, aparece suave
     const LR = lowRes();
     eraseHand(pts, now, LR);
     try { estimateForearm(pts, LR); } catch(_){ }
@@ -1101,12 +1124,13 @@ const fx = $('fx'), fxc = fx.getContext('2d'); let mb = { x:0, y:0, t:0, vx:0, v
 function composeGlove(now){
   if (fx.width !== glCanvas.width || fx.height !== glCanvas.height){ fx.width = glCanvas.width; fx.height = glCanvas.height; }
   fxc.clearRect(0, 0, fx.width, fx.height);
-  if (!glove3 || !glove3.root.visible){ return; }
+  if (!glove3 || !glove3.root.visible || TR.alpha <= 0.01){ return; }
+  fxc.globalAlpha = TR.alpha;
   const kx = fx.width / view.w;
   const bx = mb.vx * 0.022 * kx, by = mb.vy * 0.022 * kx, len = Math.hypot(bx, by), cap = 26*kx;
   const f = len > cap ? cap/len : 1, ox = bx*f, oy = by*f;
-  if (len < 1.5*kx || !CONFIG.motionBlur){ fxc.drawImage(glCanvas, 0, 0); return; }
-  const N = 5; for (let i = 0; i < N; i++){ const t = i/(N-1) - 0.5; fxc.globalAlpha = 1/(i+1); fxc.drawImage(glCanvas, -ox*t, -oy*t); }
+  if (len < 1.5*kx || !CONFIG.motionBlur){ fxc.drawImage(glCanvas, 0, 0); fxc.globalAlpha = 1; return; }
+  const N = 5; for (let i = 0; i < N; i++){ const t = i/(N-1) - 0.5; fxc.globalAlpha = TR.alpha/(i+1); fxc.drawImage(glCanvas, -ox*t, -oy*t); }
   fxc.globalAlpha = 1;
 }
 function drawSkeleton(p){
@@ -1154,7 +1178,11 @@ function palmSide(res, rightOnScreen){
     }
   }
   palmVote = THREE.MathUtils.clamp(palmVote*0.8 + vote*0.2, -1, 1);
-  return palmVote >= 0 ? 1 : -1;
+  // histéresis: solo cambia de lado cuando la evidencia es clara (evita que el guante "gire" de golpe y vuelva)
+  if (!TR.side) TR.side = palmVote >= 0 ? 1 : -1;
+  else if (TR.side > 0 && palmVote < -0.3) TR.side = -1;
+  else if (TR.side < 0 && palmVote > 0.3) TR.side = 1;
+  return TR.side;
 }
 function updateGlove(p, nIsBack, wl, now){
   const wrist=V(p[0]), idx=V(p[5]), mid=V(p[9]), pky=V(p[17]), tip=V(p[12]);
@@ -1176,8 +1204,15 @@ function updateGlove(p, nIsBack, wl, now){
   const across = new THREE.Vector3(acr.x/acr2*ra, acr.y/acr2*ra, az); across.addScaledVector(up, -across.dot(up)).normalize();
   const n = new THREE.Vector3().crossVectors(across, up).normalize();
   const back = nIsBack > 0 ? n.clone() : n.clone().negate();
-  const xl = new THREE.Vector3().crossVectors(up, back).normalize();
+  let xl = new THREE.Vector3().crossVectors(up, back).normalize();
   const thumbSign = Math.sign(across.dot(xl)) || 1;
+  // rotación suavizada: sigue rápido los giros grandes y filtra el temblor de los chicos; si cambió palma/dorso, salta
+  const qT = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xl, up, back));
+  if (!TR.q || TR.lastSide !== nIsBack) TR.q = qT.clone();
+  else { const a = TR.q.angleTo(qT); TR.q.slerp(qT, THREE.MathUtils.clamp(0.42 + a*1.4, 0.42, 1)); }
+  TR.lastSide = nIsBack;
+  const RM = new THREE.Matrix4().makeRotationFromQuaternion(TR.q);
+  xl = new THREE.Vector3().setFromMatrixColumn(RM, 0); up.setFromMatrixColumn(RM, 1); back.setFromMatrixColumn(RM, 2);
   glove3.setThumbSide(thumbSign);
   window.__ar = { nIsBack, palmVote:+palmVote.toFixed(2), thumbSign, back:[+back.x.toFixed(2),+back.y.toFixed(2),+back.z.toFixed(2)], forearm:+(FA.ang*180/Math.PI).toFixed(1), faConf:+FA.conf.toFixed(2) };   // diagnóstico (pruebas)
   // Se amolda: el cuerpo del guante se acorta al cerrar el puño
