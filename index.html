@@ -419,9 +419,9 @@ p{margin:0}
   <div class="sheet" style="border-radius:28px 28px 0 0;text-align:center;align-items:center">
     <div class="eyebrow">Seguí en tu celular</div>
     <h2 id="t-qr">Escaneá el código</h2>
-    <p class="body2" id="qr-tx" style="max-width:360px">Abrí la cámara del celular y apuntá al código. Se abre el probador con tu guante, listo para usar la cámara.</p>
+    <p class="body2" style="max-width:360px">Abrí la cámara del celular y apuntá al código.</p>
     <div class="qr-box" id="qr-box" role="img" aria-label="Código QR para abrir el probador en el celular"></div>
-    <p class="muted" style="word-break:break-all;max-width:360px" id="qr-url"></p>
+    <p class="body2" id="qr-tx" style="max-width:360px"></p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:400px">
       <button class="btn sec m" id="qr-copy">Copiar link</button>
       <button class="btn m" id="qr-close">Listo</button>
@@ -658,14 +658,14 @@ function showQR(){
     const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
     $('qr-box').innerHTML = qr.createSvgTag({ cellSize:4, margin:2, scalable:true });
   } catch(e){ $('qr-box').textContent = 'No se pudo generar el código.'; }
-  $('qr-tx').textContent = `Abrí la cámara del celular y apuntá al código. Se abre el probador con el ${m.name} · ${CONFIG.colors[S.color].label} · ${S.ozTry} Oz, listo para usar la cámara.`;
-  $('qr-url').textContent = url; $('qr').hidden = false; $('qr-close').focus();
+  $('qr-tx').textContent = `${m.name} · ${CONFIG.colors[S.color].label} · ${S.ozTry} Oz, listo para usar la cámara.`;
+  $('qr').hidden = false; $('qr-close').focus();
 }
 $('perm-qr').hidden = isTouch;                      // en el celular no hace falta
 $('perm-qr').onclick = showQR;
 $('qr-close').onclick = () => $('qr').hidden = true;
 $('qr').addEventListener('click', e => { if (e.target.id === 'qr') $('qr').hidden = true; });
-$('qr-copy').onclick = async () => { try { await navigator.clipboard.writeText(handoffUrl()); toast('Link copiado.'); } catch(_){ toast('No se pudo copiar: copiá el link que está debajo del código.'); } };
+$('qr-copy').onclick = async () => { try { await navigator.clipboard.writeText(handoffUrl()); toast('Link copiado.'); } catch(_){ toast('No se pudo copiar el link.'); } };
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('qr').hidden) $('qr').hidden = true; });
 // Al abrir el link del QR: recuperar la elección y pasar al permiso de cámara
 function resumeFromLink(){
