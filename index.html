@@ -174,6 +174,7 @@ p{margin:0}
 @keyframes open{0%,45%{opacity:1}55%,100%{opacity:0}} @keyframes fist{0%,45%{opacity:0}55%,100%{opacity:1}}
 .qr-box{background:#fff;border-radius:16px;padding:14px;width:min(64vw,260px);aspect-ratio:1;display:grid;place-items:center;box-shadow:0 0 0 1.5px var(--accent-soft)}
 .qr-box svg{width:100%;height:100%;display:block}
+.qr-manual{width:100%;max-width:400px;background:var(--surface);color:var(--fg);border:1.5px solid var(--accent-soft);border-radius:12px;padding:10px 12px;font:400 13px/18px var(--body)}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);background:var(--control);border:1.5px solid var(--line);padding:12px 16px;border-radius:12px;font-size:14px;z-index:30;max-width:90vw}
 .loading{display:flex;flex-direction:column;align-items:center;gap:14px;justify-content:center;flex:1;text-align:center}
 .spin{width:40px;height:40px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp 0.9s linear infinite}
@@ -422,6 +423,7 @@ p{margin:0}
     <p class="body2" style="max-width:360px">Abrí la cámara del celular y apuntá al código.</p>
     <div class="qr-box" id="qr-box" role="img" aria-label="Código QR para abrir el probador en el celular"></div>
     <p class="body2" id="qr-tx" style="max-width:360px"></p>
+    <input class="qr-manual" id="qr-manual" type="text" readonly hidden aria-label="Link para abrir el probador en el celular">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:400px">
       <button class="btn sec m" id="qr-copy">Copiar link</button>
       <button class="btn m" id="qr-close">Listo</button>
@@ -659,13 +661,32 @@ function showQR(){
     $('qr-box').innerHTML = qr.createSvgTag({ cellSize:4, margin:2, scalable:true });
   } catch(e){ $('qr-box').textContent = 'No se pudo generar el código.'; }
   $('qr-tx').textContent = `${m.name} · ${CONFIG.colors[S.color].label} · ${S.ozTry} Oz, listo para usar la cámara.`;
+  $('qr-manual').hidden = true; $('qr-copy').textContent = 'Copiar link';
   $('qr').hidden = false; $('qr-close').focus();
 }
 $('perm-qr').hidden = isTouch;                      // en el celular no hace falta
 $('perm-qr').onclick = showQR;
 $('qr-close').onclick = () => $('qr').hidden = true;
 $('qr').addEventListener('click', e => { if (e.target.id === 'qr') $('qr').hidden = true; });
-$('qr-copy').onclick = async () => { try { await navigator.clipboard.writeText(handoffUrl()); toast('Link copiado.'); } catch(_){ toast('No se pudo copiar el link.'); } };
+/* Copiar: primero el portapapeles moderno; si el navegador lo bloquea (navegadores dentro de apps, permisos),
+   el método clásico con un campo oculto; y si tampoco se puede, se muestra el link seleccionado para copiarlo a mano. */
+function copyFallback(text){
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px';
+  $('qr').appendChild(ta);
+  const r = document.createRange(); r.selectNodeContents(ta); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  ta.focus(); ta.setSelectionRange(0, text.length);
+  let ok = false; try { ok = document.execCommand('copy'); } catch(_){ ok = false; }
+  sel.removeAllRanges(); ta.remove(); $('qr-copy').focus();
+  return ok;
+}
+$('qr-copy').onclick = async () => {
+  const url = handoffUrl(); let ok = false;
+  if (navigator.clipboard && window.isSecureContext){ try { await navigator.clipboard.writeText(url); ok = true; } catch(_){ ok = false; } }
+  if (!ok) ok = copyFallback(url);
+  if (ok){ $('qr-copy').textContent = 'Link copiado ✓'; toast('Link copiado.'); setTimeout(() => { $('qr-copy').textContent = 'Copiar link'; }, 2500); }
+  else { const f = $('qr-manual'); f.value = url; f.hidden = false; f.focus(); f.select(); toast('Tu navegador no permite copiar automáticamente: el link quedó seleccionado para copiarlo.'); }
+};
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('qr').hidden) $('qr').hidden = true; });
 // Al abrir el link del QR: recuperar la elección y pasar al permiso de cámara
 function resumeFromLink(){
